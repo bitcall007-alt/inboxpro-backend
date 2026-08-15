@@ -6,10 +6,10 @@
 
 const { Pool } = require('pg');
 
-// Railway inyecta DATABASE_URL automáticamente al añadir el plugin Postgres
+// Neon / Railway inyectan DATABASE_URL automáticamente
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('railway') ? { rejectUnauthorized: false } : false,
+  ssl: { rejectUnauthorized: false },
 });
 
 // ============================================================
