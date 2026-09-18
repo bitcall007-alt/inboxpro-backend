@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InboxPro v2 — Mail Sender Profesional</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Clash+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#080a0f;--s1:#0d1017;--s2:#121620;--s3:#181d28;
+  --border:#1e2535;--border2:#252d3d;
+  --a1:#3b82f6;--a2:#60a5fa;--a1d:rgba(59,130,246,.1);--a1g:rgba(59,130,246,.2);
+  --ok:#22c55e;--okd:rgba(34,197,94,.1);
+  --warn:#f59e0b;--warnd:rgba(245,158,11,.1);
+  --danger:#ef4444;--dangerd:rgba(239,68,68,.1);
+  --text:#e2e8f0;--muted:#64748b;--dim:#334155;
+  --r:10px;--mono:'JetBrains Mono',monospace;--display:'Clash Display',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--display);min-height:100vh;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 20% 10%,rgba(59,130,246,.04) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 80% 80%,rgba(99,102,241,.03) 0%,transparent 60%);pointer-events:none;z-index:0}
+
+.shell{position:relative;z-index:1;display:grid;grid-template-columns:240px 1fr;grid-template-rows:56px 1fr;height:100vh;overflow:hidden}
+
+/* TOPBAR */
+.topbar{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:0 20px;background:rgba(8,10,15,.95);border-bottom:1px solid var(--border);backdrop-filter:blur(12px);z-index:100}
+.logo{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;letter-spacing:-.3px}
+.logo-mark{width:30px;height:30px;background:var(--a1);border-radius:7px;display:grid;place-items:center;font-size:14px;box-shadow:0 0 16px rgba(59,130,246,.4)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.chip{padding:3px 10px;border-radius:20px;font-family:var(--mono);font-size:10px;letter-spacing:.5px;border:1px solid}
+.chip-blue{background:var(--a1d);border-color:var(--a1g);color:var(--a2)}
+.chip-ok{background:var(--okd);border-color:rgba(34,197,94,.3);color:var(--ok)}
+.chip-warn{background:var(--warnd);border-color:rgba(245,158,11,.3);color:var(--warn)}
+.chip-danger{background:var(--dangerd);border-color:rgba(239,68,68,.3);color:var(--danger)}
+.chip-dim{background:var(--s2);border-color:var(--border);color:var(--muted)}
+
+/* SIDEBAR */
+.sidebar{border-right:1px solid var(--border);background:var(--s1);overflow-y:auto;padding:16px 12px;display:flex;flex-direction:column;gap:4px}
+.nav-group{margin-bottom:12px}
+.nav-group-label{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);padding:4px 10px;margin-bottom:4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border:1px solid transparent;transition:all .15s}
+.nav-item:hover{background:var(--s2);color:var(--text)}
+.nav-item.active{background:var(--a1d);border-color:var(--a1g);color:var(--a2)}
+.nav-icon{font-size:15px;width:18px;text-align:center}
+.nav-badge{margin-left:auto;background:var(--a1);color:#fff;font-family:var(--mono);font-size:9px;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center}
+
+/* strike meter */
+.strike-meter{margin-top:auto;background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.strike-title{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:10px}
+.strike-bar-wrap{margin-bottom:8px}
+.strike-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px}
+.strike-label span:first-child{color:var(--muted);font-family:var(--mono)}
+.strike-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.strike-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.sf-ok{background:var(--ok)}.sf-warn{background:var(--warn)}.sf-danger{background:var(--danger)}
+
+/* MAIN */
+.main{overflow-y:auto;padding:24px 28px;background:var(--bg)}
+.page{display:none}.page.active{display:block}
+.ph{margin-bottom:24px}
+.ph-title{font-size:20px;font-weight:700;letter-spacing:-.5px;margin-bottom:4px}
+.ph-sub{font-size:12.5px;color:var(--muted)}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.card-hd{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;margin-bottom:16px;color:var(--text)}
+.card-hd-dot{width:6px;height:6px;border-radius:50%;background:var(--a1)}
+
+/* FORM */
+.fg{display:grid;gap:14px;margin-bottom:14px}
+.fg2{grid-template-columns:1fr 1fr}.fg3{grid-template-columns:1fr 1fr 1fr}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.field input,.field select,.field textarea{background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:12.5px;padding:9px 12px;outline:none;transition:border-color .15s,box-shadow .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--a1);box-shadow:0 0 0 3px var(--a1d)}
+.field textarea{resize:vertical;min-height:80px;line-height:1.6}
+.field select option{background:var(--s2)}
+.field-hint{font-size:10.5px;color:var(--dim);font-family:var(--mono)}
+
+/* TAGS */
+.tags-box{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:7px;display:flex;flex-wrap:wrap;gap:5px;cursor:text;min-height:42px;transition:border-color .15s}
+.tags-box:focus-within{border-color:var(--a1);box-shadow:0 0 0 3px var(--a1d)}
+.tag{background:var(--a1d);border:1px solid var(--a1g);color:var(--a2);padding:2px 8px 2px 10px;border-radius:20px;font-family:var(--mono);font-size:11px;display:flex;align-items:center;gap:5px}
+.tag-x{cursor:pointer;opacity:.6;font-size:13px}.tag-x:hover{opacity:1}
+.tags-input{background:none;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:12px;flex:1;min-width:140px;padding:2px 4px}
+
+/* EDITOR */
+.editor-tb{display:flex;gap:3px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;padding:7px 9px}
+.tb-btn{background:none;border:1px solid transparent;color:var(--muted);width:28px;height:26px;border-radius:5px;cursor:pointer;font-size:12px;display:grid;place-items:center;transition:all .1s}
+.tb-btn:hover{background:var(--border);color:var(--text)}
+.tb-sep{width:1px;height:20px;background:var(--border);margin:3px}
+.tb-var{padding:2px 8px;width:auto;font-family:var(--mono);font-size:10px;color:var(--a2);border-color:var(--a1g);background:var(--a1d);border-radius:4px}
+.tb-var:hover{background:var(--a1);color:#fff}
+#richEditor{background:var(--s2);border:1px solid var(--border);border-radius:0 0 8px 8px;color:var(--text);font-family:var(--mono);font-size:12.5px;min-height:200px;padding:14px;outline:none;line-height:1.8}
+#richEditor:focus{border-color:var(--a1)}
+
+/* TABS */
+.tabs{display:flex;gap:3px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:4px;width:fit-content;margin-bottom:14px}
+.tab-btn{padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);transition:all .15s;border:1px solid transparent}
+.tab-btn.active{background:var(--bg);color:var(--a2);border-color:var(--a1g)}
+.tab-content{display:none}.tab-content.active{display:block}
+
+/* BTNS */
+.btn{padding:9px 18px;border-radius:8px;font-family:var(--display);font-weight:600;font-size:13px;cursor:pointer;border:1px solid transparent;transition:all .15s;display:inline-flex;align-items:center;gap:7px}
+.btn-primary{background:var(--a1);color:#fff;border-color:var(--a1)}
+.btn-primary:hover{box-shadow:0 0 20px rgba(59,130,246,.4);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-ghost{background:var(--s2);color:var(--muted);border-color:var(--border)}
+.btn-ghost:hover{border-color:var(--a1);color:var(--a2)}
+.btn-ok{background:var(--okd);color:var(--ok);border-color:rgba(34,197,94,.3)}
+.btn-danger{background:var(--dangerd);color:var(--danger);border-color:rgba(239,68,68,.3)}
+.btn-warn{background:var(--warnd);color:var(--warn);border-color:rgba(245,158,11,.3)}
+.btn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+
+/* DROPZONE */
+.dropzone{border:2px dashed var(--border2);border-radius:var(--r);padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--s2);position:relative}
+.dropzone:hover,.dropzone.drag{border-color:var(--a1);background:var(--a1d)}
+.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.dz-icon{font-size:36px;margin-bottom:12px}
+.dz-title{font-size:15px;font-weight:600;margin-bottom:6px}
+.dz-sub{font-size:12px;color:var(--muted)}
+
+/* TABLE */
+.tbl-wrap{overflow:auto;border-radius:var(--r);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{background:var(--s2);border-bottom:1px solid var(--border)}
+th{padding:10px 14px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:500}
+td{padding:9px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11.5px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--s2)}
+.td-ok{color:var(--ok)}.td-warn{color:var(--warn)}.td-danger{color:var(--danger)}
+
+/* SUM GRID */
+.sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.sum-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.sum-val{font-size:24px;font-weight:700;letter-spacing:-1px}
+.sum-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px}
+
+/* PROGRESS */
+.prog-wrap{margin:12px 0}
+.prog-label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px}
+.prog-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:var(--a1);border-radius:3px;transition:width .3s;box-shadow:0 0 8px rgba(59,130,246,.4)}
+.prog-fill.ok{background:var(--ok);box-shadow:0 0 8px rgba(34,197,94,.4)}
+
+/* LOG */
+.log{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;height:200px;overflow-y:auto;font-family:var(--mono);font-size:11.5px}
+.log-line{padding:2px 0;display:flex;gap:8px}
+.log-ts{color:var(--dim);flex-shrink:0}
+.log-ok{color:var(--ok)}.log-warn{color:var(--warn)}.log-err{color:var(--danger)}.log-info{color:var(--muted)}
+
+/* TOGGLE */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-info{flex:1}
+.toggle-name{font-size:13px;font-weight:600}
+.toggle-desc{font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
+.switch{position:relative;display:inline-block;width:38px;height:20px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:20px;transition:.2s}
+.slider::before{content:'';position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.2s}
+input:checked+.slider{background:var(--a1)}
+input:checked+.slider::before{transform:translateX(18px);background:#fff}
+
+/* SCORE */
+.score-block{display:flex;align-items:center;gap:20px;margin-bottom:16px}
+.score-ring svg{width:76px;height:76px}
+.score-num{font-size:30px;font-weight:700;letter-spacing:-1px}
+.score-txt{font-size:11.5px;color:var(--muted);margin-top:3px}
+.check-list{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-family:var(--mono)}
+
+/* ALERT */
+.alert{display:flex;gap:10px;padding:11px 14px;border-radius:8px;font-size:12.5px;margin-bottom:14px;border:1px solid}
+.alert-info{background:rgba(59,130,246,.06);border-color:rgba(59,130,246,.2);color:#93c5fd}
+.alert-ok{background:var(--okd);border-color:rgba(34,197,94,.3);color:var(--ok)}
+.alert-warn{background:var(--warnd);border-color:rgba(245,158,11,.3);color:var(--warn)}
+.alert-danger{background:var(--dangerd);border-color:rgba(239,68,68,.3);color:var(--danger)}
+
+/* AS GRID */
+.as-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.as-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:14px}
+.as-title{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.as-val{font-size:22px;font-weight:700;letter-spacing:-1px}
+.as-limit{font-size:11px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.as-bar{height:4px;background:var(--border);border-radius:2px;margin-top:10px;overflow:hidden}
+.as-fill{height:100%;border-radius:2px;transition:width .4s}
+
+/* WARMUP */
+.wucal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px}
+.wuday{background:var(--s2);border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center}
+.wuday-num{font-family:var(--mono);font-size:9px;color:var(--muted)}
+.wuday-val{font-size:14px;font-weight:700;color:var(--a2);margin-top:2px}
+
+/* COL MAPPER */
+.col-mapper{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:12px}
+.col-map-item{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:12px}
+.col-map-label{font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px}
+.col-map-select{width:100%;background:var(--s3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 8px;outline:none}
+.col-map-select:focus{border-color:var(--a1)}
+
+/* BACKEND STATUS */
+.backend-indicator{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px}
+.bi-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+.pulse-anim{animation:pulse 1.5s ease-in-out infinite}
+
+@media(max-width:800px){
+  .shell{grid-template-columns:1fr;grid-template-rows:56px 48px 1fr}
+  .sidebar{grid-row:2;flex-direction:row;overflow-x:auto;padding:8px;border-right:none;border-bottom:1px solid var(--border)}
+  .main{grid-row:3}
+  .fg2,.fg3,.as-grid,.sum-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="logo">
+    <div class="logo-mark">✉</div>
+    Inbox<span style="color:var(--a2)">Pro</span>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-left:4px">v2.0</span>
+  </div>
+  <div class="topbar-right">
+    <span class="chip chip-blue" id="contactCount">0 contactos</span>
+    <span class="chip" id="smtpChip" style="background:var(--dangerd);border-color:rgba(239,68,68,.3);color:var(--danger)">⬤ Sin backend</span>
+    <span class="chip chip-dim" id="asChip">🛡 Anti-Strike ON</span>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="nav-group">
+    <div class="nav-group-label">Campaña</div>
+    <div class="nav-item active" onclick="nav('compose')"><span class="nav-icon">✏️</span>Redactar</div>
+    <div class="nav-item" onclick="nav('import')"><span class="nav-icon">📥</span>Importar Excel<span class="nav-badge" id="navBadge">0</span></div>
+    <div class="nav-item" onclick="nav('send')"><span class="nav-icon">🚀</span>Enviar</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-label">Control</div>
+    <div class="nav-item" onclick="nav('antistrike')"><span class="nav-icon">🛡</span>Anti-Strike</div>
+    <div class="nav-item" onclick="nav('warmup')"><span class="nav-icon">🔥</span>Warm-Up</div>
+  </div>
+  <div class="nav-group">
+    <div class="nav-group-label">Sistema</div>
+    <div class="nav-item" onclick="nav('settings')"><span class="nav-icon">⚙️</span>Configuración</div>
+  </div>
+  <div class="strike-meter">
+    <div class="strike-title">MONITOR EN VIVO</div>
+    <div class="strike-bar-wrap">
+      <div class="strike-label"><span>Bounce</span><span id="mBounceVal" style="color:var(--ok)">0.0%</span></div>
+      <div class="strike-track"><div class="strike-fill sf-ok" id="mBounceFill" style="width:0%"></div></div>
+    </div>
+    <div class="strike-bar-wrap">
+      <div class="strike-label"><span>Enviados hoy</span><span id="mSentVal" style="color:var(--a2)">0</span></div>
+      <div class="strike-track"><div class="strike-fill" id="mSentFill" style="width:0%;background:var(--a1)"></div></div>
+    </div>
+    <div class="strike-bar-wrap">
+      <div class="strike-label"><span>Estado</span><span id="mStatus" style="color:var(--ok)">OK</span></div>
+      <div class="strike-track"><div class="strike-fill sf-ok" id="mStatusFill" style="width:100%"></div></div>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- COMPOSE -->
+<div class="page active" id="page-compose">
+  <div class="ph"><div class="ph-title">✏️ Redactar Campaña</div><div class="ph-sub">Inbox Score en tiempo real · Variables {{nombre}} soportadas</div></div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Remitente</div>
+    <div class="fg fg2">
+      <div class="field"><label>Nombre del remitente</label><input type="text" id="fromName" placeholder="Soporte TiendaXYZ" /></div>
+      <div class="field"><label>Email remitente</label><input type="email" id="fromEmail" placeholder="hola@tudominio.com" oninput="scoreUpdate()" /></div>
+    </div>
+    <div class="fg fg2">
+      <div class="field"><label>Reply-To (opcional)</label><input type="email" id="replyTo" placeholder="respuestas@tudominio.com" /></div>
+      <div class="field"><label>Prioridad</label><select id="priority"><option value="3">Normal</option><option value="1">Alta</option><option value="5">Baja</option></select></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Asunto & Preheader</div>
+    <div class="fg">
+      <div class="field"><label>Asunto — soporta {{variables}}</label>
+        <input type="text" id="subject" placeholder="Hola {{nombre}}, tenemos algo para ti 🎁" oninput="scoreUpdate();analyzeSubject()" maxlength="120" />
+        <div class="field-hint" id="subjectHint"></div>
+      </div>
+      <div class="field"><label>Preheader (texto invisible de preview)</label><input type="text" id="preheader" placeholder="Esta oferta vence en 48h · No te la pierdas..." maxlength="150" oninput="scoreUpdate()" /></div>
+    </div>
+    <div id="subjectAlerts"></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Cuerpo del email</div>
+    <div class="tabs">
+      <div class="tab-btn active" onclick="bodyTab('rich')">✨ Visual</div>
+      <div class="tab-btn" onclick="bodyTab('html')">🖥 HTML</div>
+      <div class="tab-btn" onclick="bodyTab('plain')">📄 Texto plano</div>
+    </div>
+    <div class="tab-content active" id="tab-rich">
+      <div class="editor-tb">
+        <button class="tb-btn" onclick="fmt('bold')"><b>B</b></button>
+        <button class="tb-btn" onclick="fmt('italic')"><i>I</i></button>
+        <button class="tb-btn" onclick="fmt('underline')"><u>U</u></button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="fmt('insertUnorderedList')">☰</button>
+        <button class="tb-btn" onclick="fmt('insertOrderedList')">≡</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="insertLink()">🔗</button>
+        <div class="tb-sep"></div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--muted);align-self:center">Variables:</span>
+        <button class="tb-btn tb-var" onclick="insertVar('nombre')">{{nombre}}</button>
+        <button class="tb-btn tb-var" onclick="insertVar('empresa')">{{empresa}}</button>
+        <button class="tb-btn tb-var" onclick="insertVar('email')">{{email}}</button>
+        <button class="tb-btn tb-var" onclick="insertVar('ciudad')">{{ciudad}}</button>
+      </div>
+      <div id="richEditor" contenteditable="true" oninput="scoreUpdate()">
+        <p>Hola <strong>{{nombre}}</strong>,</p><p>Escribe aquí tu mensaje...</p><br>
+        <p>Saludos,<br>El equipo</p><br>
+        <p style="font-size:11px;color:#6b7280">Para darte de baja haz clic <a href="#" style="color:#3b82f6">aquí</a>.</p>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-html">
+      <div class="field"><textarea id="htmlBody" style="min-height:220px" placeholder="<h1>Hola {{nombre}}</h1>..." oninput="scoreUpdate()"></textarea></div>
+    </div>
+    <div class="tab-content" id="tab-plain">
+      <div class="field"><textarea id="plainBody" style="min-height:160px" placeholder="Hola {{nombre}},&#10;&#10;Tu mensaje aquí...&#10;&#10;Para darte de baja responde BAJA." oninput="scoreUpdate()"></textarea></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Inbox Score</div>
+    <div class="score-block">
+      <div class="score-ring">
+        <svg viewBox="0 0 76 76">
+          <circle cx="38" cy="38" r="32" fill="none" stroke="var(--border)" stroke-width="7"/>
+          <circle id="scoreRing" cx="38" cy="38" r="32" fill="none" stroke="var(--a1)" stroke-width="7"
+            stroke-dasharray="201" stroke-dashoffset="201" stroke-linecap="round"
+            transform="rotate(-90 38 38)" style="transition:stroke-dashoffset .6s,stroke .4s"/>
+        </svg>
+      </div>
+      <div><div class="score-num" id="scoreNum">—</div><div class="score-txt" id="scoreTxt">Completa el formulario</div></div>
+      <div class="check-list" id="scoreChecks"></div>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT -->
+<div class="page" id="page-import">
+  <div class="ph"><div class="ph-title">📥 Importar Contactos</div><div class="ph-sub">Excel / CSV · Mapeo automático · Validación instantánea</div></div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Subir archivo</div>
+    <div class="dropzone" id="dropzone" ondragover="dzOver(event)" ondragleave="dzLeave()" ondrop="dzDrop(event)">
+      <input type="file" accept=".xlsx,.xls,.csv" onchange="fileSelected(this)" />
+      <div class="dz-icon">📊</div>
+      <div class="dz-title">Arrastra tu Excel o CSV aquí</div>
+      <div class="dz-sub">.xlsx · .xls · .csv · Hasta 50,000 contactos</div>
+    </div>
+  </div>
+  <div class="card" id="mapperCard" style="display:none">
+    <div class="card-hd"><div class="card-hd-dot"></div>Mapear columnas</div>
+    <div class="alert alert-info">💡 Asigna columnas. <strong>Email es obligatorio.</strong></div>
+    <div class="col-mapper" id="colMapper"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="processContacts()">✅ Procesar</button>
+      <button class="btn btn-ghost" onclick="resetImport()">↩ Volver</button>
+    </div>
+  </div>
+  <div id="importSummary" style="display:none">
+    <div class="sum-grid">
+      <div class="sum-card"><div class="sum-val" id="sumTotal" style="color:var(--a2)">0</div><div class="sum-label">TOTAL FILAS</div></div>
+      <div class="sum-card"><div class="sum-val" id="sumValid" style="color:var(--ok)">0</div><div class="sum-label">VÁLIDOS</div></div>
+      <div class="sum-card"><div class="sum-val" id="sumDup" style="color:var(--warn)">0</div><div class="sum-label">DUPLICADOS</div></div>
+      <div class="sum-card"><div class="sum-val" id="sumInvalid" style="color:var(--danger)">0</div><div class="sum-label">INVÁLIDOS</div></div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:600">Vista previa</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost" style="padding:5px 12px;font-size:11px" onclick="filterContacts('all')">Todos</button>
+          <button class="btn btn-ok" style="padding:5px 12px;font-size:11px" onclick="filterContacts('valid')">✓ Válidos</button>
+          <button class="btn btn-danger" style="padding:5px 12px;font-size:11px" onclick="filterContacts('invalid')">✗ Inválidos</button>
+        </div>
+      </div>
+      <div class="tbl-wrap" style="max-height:300px;border:none;border-radius:0">
+        <table><thead><tr id="tableHead"></tr></thead><tbody id="tableBody"></tbody></table>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="nav('send')">🚀 Ir a Enviar →</button>
+      <button class="btn btn-ghost" onclick="exportClean()">💾 Exportar lista limpia</button>
+      <button class="btn btn-danger" onclick="resetImport()">🗑 Limpiar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEND -->
+<div class="page" id="page-send">
+  <div class="ph"><div class="ph-title">🚀 Enviar Campaña</div><div class="ph-sub">Revisa el checklist · luego inicia el envío real via backend</div></div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Pre-flight checklist</div>
+    <div id="preflightList"></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Opciones de envío</div>
+    <div class="fg fg3">
+      <div class="field"><label>Delay entre emails (ms)</label><input type="number" id="sendDelay" value="1500" min="500" max="30000" /></div>
+      <div class="field"><label>Emails por lote</label><input type="number" id="batchSize" value="50" min="1" max="500" /></div>
+      <div class="field"><label>Pausa entre lotes (seg)</label><input type="number" id="batchPause" value="60" min="10" max="3600" /></div>
+    </div>
+    <div class="fg fg2">
+      <div class="field"><label>Límite diario</label><input type="number" id="dailyLimit" value="300" min="1" max="10000" /></div>
+      <div class="field"><label>Max bounce % antes de pausar</label><input type="number" id="bounceLimit" value="2" min="0.5" max="10" step="0.5" /></div>
+    </div>
+    <div class="fg fg2">
+      <div class="field"><label>Validar MX antes de enviar</label>
+        <select id="validateMx"><option value="true">Sí (recomendado)</option><option value="false">No (más rápido)</option></select>
+      </div>
+      <div class="field"><label>Delay humanizado (±30%)</label>
+        <select id="humanize"><option value="true">Sí (recomendado)</option><option value="false">No</option></select>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Resumen</div>
+    <div class="fg fg3" style="margin-bottom:14px">
+      <div class="sum-card"><div class="sum-val" id="sSendTo" style="color:var(--a2)">0</div><div class="sum-label">A ENVIAR</div></div>
+      <div class="sum-card"><div class="sum-val" id="sSent" style="color:var(--ok)">0</div><div class="sum-label">ENVIADOS</div></div>
+      <div class="sum-card"><div class="sum-val" id="sBounce" style="color:var(--danger)">0</div><div class="sum-label">BOUNCES</div></div>
+    </div>
+    <div class="prog-wrap" id="progWrap" style="display:none">
+      <div class="prog-label"><span id="progTxt">Preparando...</span><span id="progPct">0%</span></div>
+      <div class="prog-track"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+    <div class="log" id="sendLog" style="display:none;margin:12px 0"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="sendBtn" onclick="startSend()">🚀 Iniciar envío real</button>
+      <button class="btn btn-warn" id="pauseBtn" onclick="togglePause()" style="display:none">⏸ Pausar</button>
+      <button class="btn btn-danger" id="stopBtn" onclick="stopSend()" style="display:none">⏹ Detener</button>
+    </div>
+  </div>
+</div>
+
+<!-- ANTI-STRIKE -->
+<div class="page" id="page-antistrike">
+  <div class="ph"><div class="ph-title">🛡 Motor Anti-Strike</div><div class="ph-sub">Protección activa · datos del backend en tiempo real</div></div>
+  <div class="alert alert-warn">⚠️ <strong>Bounce &gt;2%</strong> o <strong>Spam &gt;0.1%</strong> = pausa automática inmediata en el backend.</div>
+  <div class="as-grid">
+    <div class="as-card"><div class="as-title">Bounces</div><div class="as-val" id="asBounce" style="color:var(--ok)">0</div><div class="as-limit">Límite: <span id="asBounceLimit">2</span>%</div><div class="as-bar"><div class="as-fill sf-ok" id="asBounceFill" style="width:0%"></div></div></div>
+    <div class="as-card"><div class="as-title">Spam complaints</div><div class="as-val" id="asSpam" style="color:var(--ok)">0</div><div class="as-limit">Límite: 0.1%</div><div class="as-bar"><div class="as-fill sf-ok" id="asSpamFill" style="width:0%"></div></div></div>
+    <div class="as-card"><div class="as-title">Enviados hoy</div><div class="as-val" id="asSentToday" style="color:var(--a2)">0</div><div class="as-limit">Límite: <span id="asDailyLimit">300</span></div><div class="as-bar"><div class="as-fill" id="asDailyFill" style="width:0%;background:var(--a1)"></div></div></div>
+    <div class="as-card"><div class="as-title">Estado backend</div><div class="as-val" id="asStatus" style="color:var(--ok)">—</div><div class="as-limit" id="asStatusMsg">Sin conectar</div><div class="as-bar"><div class="as-fill" id="asStatusFill" style="width:0%;background:var(--ok)"></div></div></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Protecciones configuradas</div>
+    <div class="toggle-row"><div class="toggle-info"><div class="toggle-name">Auto-pausa por bounce</div><div class="toggle-desc">El backend detiene envío automáticamente al superar el límite</div></div><label class="switch"><input type="checkbox" checked disabled><span class="slider"></span></label></div>
+    <div class="toggle-row"><div class="toggle-info"><div class="toggle-name">Delay humanizado</div><div class="toggle-desc">Variación ±30% en el delay entre emails</div></div><label class="switch"><input type="checkbox" id="pHumanDelay" checked><span class="slider"></span></label></div>
+    <div class="toggle-row"><div class="toggle-info"><div class="toggle-name">Validación MX</div><div class="toggle-desc">Verificar registro MX antes de cada envío</div></div><label class="switch"><input type="checkbox" id="pMxCheck" checked><span class="slider"></span></label></div>
+    <div class="toggle-row"><div class="toggle-info"><div class="toggle-name">Rotación SMTP</div><div class="toggle-desc">Cambia de cuenta SMTP al detectar bloqueo</div></div><label class="switch"><input type="checkbox" id="pRotate" checked><span class="slider"></span></label></div>
+    <div class="toggle-row"><div class="toggle-info"><div class="toggle-name">Filtrar emails de roles (info@, admin@)</div><div class="toggle-desc">Elimina emails que generan más bounces</div></div><label class="switch"><input type="checkbox" id="pFilterRoles" checked><span class="slider"></span></label></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-ghost" onclick="fetchBackendStatus()">🔄 Actualizar desde backend</button>
+    <button class="btn btn-ok" onclick="resumeBackend()">▶ Reanudar envío</button>
+  </div>
+</div>
+
+<!-- WARMUP -->
+<div class="page" id="page-warmup">
+  <div class="ph"><div class="ph-title">🔥 Plan de Warm-Up</div><div class="ph-sub">Calentamiento progresivo — crítico para inbox rate</div></div>
+  <div class="alert alert-info">💡 El warm-up gradual entrena a Gmail y Outlook a confiar en tu IP. Nunca saltes este paso.</div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Configurar plan</div>
+    <div class="fg fg3">
+      <div class="field"><label>Emails día 1</label><input type="number" id="wuStart" value="20" min="5" max="100" oninput="renderWarmup()" /></div>
+      <div class="field"><label>Incremento diario (%)</label><input type="number" id="wuInc" value="20" min="5" max="50" oninput="renderWarmup()" /></div>
+      <div class="field"><label>Duración (días)</label><input type="number" id="wuDays" value="21" min="7" max="60" oninput="renderWarmup()" /></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Calendario</div>
+    <div class="wucal" id="wuCalendar"></div>
+    <div style="margin-top:14px;font-size:12.5px;color:var(--muted)">
+      Capacidad final del plan: <strong id="wuFinal" style="color:var(--ok)">—</strong> emails/día
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="ph"><div class="ph-title">⚙️ Configuración</div><div class="ph-sub">Conecta tu backend Railway · configura credenciales</div></div>
+
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Backend URL (Railway)</div>
+    <div class="alert alert-info">🚀 Despliega el backend en Railway y pega aquí la URL que te dé. Ej: <code>https://inboxpro-backend.up.railway.app</code></div>
+    <div class="fg">
+      <div class="field"><label>URL del backend</label><input type="text" id="backendUrl" placeholder="https://tu-proyecto.up.railway.app" /></div>
+      <div class="field"><label>API Secret (mismo que en .env)</label><input type="password" id="apiSecret" placeholder="tu_clave_secreta" /></div>
+    </div>
+    <div id="backendTestResult" style="display:none;margin-bottom:12px"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveBackendConfig()">💾 Guardar</button>
+      <button class="btn btn-ghost" onclick="testBackend()">🔌 Probar conexión</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><div class="card-hd-dot"></div>Guía de deploy en Railway — paso a paso</div>
+    <div style="display:flex;flex-direction:column;gap:14px;font-size:13px">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span style="background:var(--a1);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">1</span>
+        <div><strong>Crea cuenta en Brevo</strong><br><span style="color:var(--muted);font-size:12px">brevo.com → gratis → Settings → SMTP & API → Genera SMTP key → copia host, user y password</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span style="background:var(--a1);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">2</span>
+        <div><strong>Sube el backend a GitHub</strong><br><span style="color:var(--muted);font-size:12px">Crea repo privado → sube los archivos del backend (server.js, package.json, railway.json)</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span style="background:var(--a1);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">3</span>
+        <div><strong>Deploy en Railway</strong><br><span style="color:var(--muted);font-size:12px">railway.app → New Project → Deploy from GitHub → selecciona tu repo → Railway detecta Node.js automáticamente</span></div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span style="background:var(--a1);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">4</span>
+        <div><strong>Configura variables de entorno en Railway</strong><br>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--a2)">
+            SMTP_HOST=smtp-relay.brevo.com<br>
+            SMTP_PORT=587<br>
+            SMTP_USER=tu@email.com<br>
+            SMTP_PASS=tu_api_key_brevo<br>
+            API_SECRET=clave_secreta_larga<br>
+            ALLOWED_ORIGINS=https://tu-frontend.netlify.app
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span style="background:var(--ok);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">5</span>
+        <div><strong>Copia la URL de Railway y pégala arriba</strong><br><span style="color:var(--muted);font-size:12px">Railway te da una URL tipo: https://inboxpro-xxxxx.up.railway.app — pégala en el campo Backend URL</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const S = {
+  contacts:[], validContacts:[], rawCols:[], rawData:[], colMap:{},
+  sending:false, paused:false, stopped:false,
+  sentCount:0, bounceCount:0, sentToday:0,
+  backendUrl:'', apiSecret:'',
+};
+
+const SPAM_WDS = ['gratis','free','garantizado','urgente','100%','click aquí','gana dinero','winner','prize','cash','felicitaciones'];
+const ROLE_EMAILS = ['info@','admin@','support@','contact@','hello@','sales@','noreply@','no-reply@','postmaster@','webmaster@'];
+
+// ============================================================
+// NAV
+// ============================================================
+function nav(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  const map={compose:0,import:1,send:2,antistrike:3,warmup:4,settings:5};
+  document.querySelectorAll('.nav-item')[map[id]]?.classList.add('active');
+  if(id==='send') buildPreflight();
+  if(id==='warmup') renderWarmup();
+  if(id==='antistrike') fetchBackendStatus();
+}
+
+// ============================================================
+// COMPOSE
+// ============================================================
+function fmt(cmd){document.execCommand(cmd,false,null)}
+function insertLink(){const u=prompt('URL:');if(u)document.execCommand('createLink',false,u)}
+function insertVar(v){document.getElementById('richEditor').focus();document.execCommand('insertText',false,`{{${v}}}`);}
+function bodyTab(t){
+  const tabs=['rich','html','plain'];
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',tabs[i]===t));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+}
+function analyzeSubject(){
+  const sub=document.getElementById('subject').value;
+  document.getElementById('subjectHint').textContent=sub?`${sub.length}/120 caracteres`:'';
+  const issues=[];
+  if(sub.length>70) issues.push({t:'warn',m:`Muy largo (${sub.length}). Ideal <60.`});
+  if(sub===sub.toUpperCase()&&sub.length>4) issues.push({t:'danger',m:'Todo en MAYÚSCULAS — activa filtros spam.'});
+  if((sub.match(/!/g)||[]).length>1) issues.push({t:'warn',m:'Demasiados signos !'});
+  SPAM_WDS.forEach(w=>{if(sub.toLowerCase().includes(w)) issues.push({t:'danger',m:`Palabra spam: "${w}"`});});
+  document.getElementById('subjectAlerts').innerHTML=issues.map(i=>`<div class="alert alert-${i.t==='danger'?'danger':'warn'}" style="margin-bottom:6px;padding:7px 12px;font-size:11.5px">${i.t==='danger'?'✗':'⚠'} ${i.m}</div>`).join('');
+}
+function scoreUpdate(){
+  const checks=[];let score=0;
+  const fromEmail=document.getElementById('fromEmail').value;
+  const fromDomain=(fromEmail.split('@')[1]||'').toLowerCase();
+  const free=['gmail.com','yahoo.com','hotmail.com','outlook.com','live.com'];
+  if(fromDomain&&!free.includes(fromDomain)){checks.push({ok:true,l:'Dominio propio'});score+=20;}
+  else checks.push({ok:false,l:'Usar dominio propio'});
+  const sub=document.getElementById('subject').value;
+  const subOk=sub&&sub.length<=70&&!SPAM_WDS.some(w=>sub.toLowerCase().includes(w));
+  if(subOk){checks.push({ok:true,l:'Asunto limpio'});score+=15;}
+  else checks.push({ok:false,l:'Asunto con issues'});
+  if(document.getElementById('preheader').value){checks.push({ok:true,l:'Preheader OK'});score+=10;}
+  else checks.push({ok:false,l:'Agregar preheader'});
+  const body=document.getElementById('richEditor').innerHTML+document.getElementById('htmlBody').value;
+  if(body.replace(/<[^>]*>/g,'').trim().length>80){checks.push({ok:true,l:'Cuerpo con contenido'});score+=15;}
+  else checks.push({ok:false,l:'Cuerpo muy corto'});
+  if(document.getElementById('plainBody').value.length>10){checks.push({ok:true,l:'Texto plano incluido'});score+=15;}
+  else checks.push({ok:false,l:'Agregar texto plano'});
+  const bl=body.toLowerCase();
+  if(bl.includes('baja')||bl.includes('unsubscribe')||bl.includes('cancelar')){checks.push({ok:true,l:'Link de baja'});score+=15;}
+  else checks.push({ok:false,l:'Agregar link de baja'});
+  if(S.validContacts.length>0){checks.push({ok:true,l:`${S.validContacts.length} contactos`});score+=10;}
+  else checks.push({ok:false,l:'Importar contactos'});
+  const ring=document.getElementById('scoreRing');
+  const offset=201-(score/100)*201;
+  ring.style.strokeDashoffset=offset;
+  document.getElementById('scoreNum').textContent=score;
+  if(score>=80){ring.style.stroke='var(--ok)';document.getElementById('scoreNum').style.color='var(--ok)';document.getElementById('scoreTxt').textContent='🟢 Excelente inbox score';}
+  else if(score>=55){ring.style.stroke='var(--warn)';document.getElementById('scoreNum').style.color='var(--warn)';document.getElementById('scoreTxt').textContent='🟡 Score aceptable';}
+  else{ring.style.stroke='var(--danger)';document.getElementById('scoreNum').style.color='var(--danger)';document.getElementById('scoreTxt').textContent='🔴 Alto riesgo de spam';}
+  document.getElementById('scoreChecks').innerHTML=checks.map(c=>`<div style="color:${c.ok?'var(--ok)':'var(--dim)'}">${c.ok?'✓':'○'} ${c.l}</div>`).join('');
+}
+
+// ============================================================
+// IMPORT
+// ============================================================
+function dzOver(e){e.preventDefault();document.getElementById('dropzone').classList.add('drag')}
+function dzLeave(){document.getElementById('dropzone').classList.remove('drag')}
+function dzDrop(e){e.preventDefault();dzLeave();if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0])}
+function fileSelected(input){if(input.files[0])readFile(input.files[0])}
+function readFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    if(json.length<2){alert('Archivo vacío.');return;}
+    S.rawCols=json[0].map(c=>String(c).trim());
+    S.rawData=json.slice(1).filter(r=>r.some(c=>c!==''));
+    renderMapper();
+  };
+  r.readAsArrayBuffer(file);
+}
+function renderMapper(){
+  document.getElementById('mapperCard').style.display='block';
+  document.getElementById('importSummary').style.display='none';
+  const fields=['email','nombre','apellido','empresa','ciudad','telefono','personalizado1','personalizado2'];
+  document.getElementById('colMapper').innerHTML=fields.map(f=>`
+    <div class="col-map-item"><div class="col-map-label">${f.toUpperCase()}</div>
+    <select class="col-map-select" id="map_${f}">
+      <option value="">-- No mapear --</option>
+      ${S.rawCols.map((c,i)=>`<option value="${i}" ${autoMatch(c,f)?'selected':''}>${c}</option>`).join('')}
+    </select></div>`).join('');
+}
+function autoMatch(col,field){
+  const c=col.toLowerCase();
+  const map={email:['email','correo','mail'],nombre:['nombre','name','first'],apellido:['apellido','lastname'],empresa:['empresa','company'],ciudad:['ciudad','city'],telefono:['telefono','phone','tel']};
+  return(map[field]||[]).some(k=>c.includes(k));
+}
+function processContacts(){
+  const emailColStr=document.getElementById('map_email').value;
+  if(emailColStr===''){alert('Mapea la columna Email.');return;}
+  const emailCol=parseInt(emailColStr);
+  const fields=['email','nombre','apellido','empresa','ciudad','telefono','personalizado1','personalizado2'];
+  S.colMap={};
+  fields.forEach(f=>{const v=document.getElementById('map_'+f).value;if(v!=='')S.colMap[f]=parseInt(v);});
+  const seen=new Set();let valid=0,dups=0,invalid=0;
+  S.contacts=S.rawData.map(row=>{
+    const email=String(row[emailCol]).trim().toLowerCase();
+    const c={email};
+    fields.forEach(f=>{if(S.colMap[f]!==undefined)c[f]=String(row[S.colMap[f]]||'').trim();});
+    if(!isValidEmail(email)){c._status='invalid';invalid++;}
+    else if(seen.has(email)){c._status='dup';dups++;}
+    else if(isRoleEmail(email)&&document.getElementById('pFilterRoles')?.checked){c._status='invalid';invalid++;}
+    else{seen.add(email);c._status='valid';valid++;}
+    return c;
+  });
+  S.validContacts=S.contacts.filter(c=>c._status==='valid');
+  updateContactCount();
+  document.getElementById('sumTotal').textContent=S.contacts.length;
+  document.getElementById('sumValid').textContent=valid;
+  document.getElementById('sumDup').textContent=dups;
+  document.getElementById('sumInvalid').textContent=invalid;
+  document.getElementById('importSummary').style.display='block';
+  document.getElementById('mapperCard').style.display='none';
+  renderTable('valid');
+}
+function isValidEmail(e){return/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)}
+function isRoleEmail(e){return ROLE_EMAILS.some(r=>e.startsWith(r))}
+function filterContacts(mode){renderTable(mode)}
+function renderTable(mode){
+  const list=mode==='all'?S.contacts:mode==='valid'?S.contacts.filter(c=>c._status==='valid'):S.contacts.filter(c=>c._status!=='valid');
+  const cols=Object.keys(S.colMap).filter(k=>k!=='_status');
+  if(!cols.includes('email'))cols.unshift('email');
+  document.getElementById('tableHead').innerHTML=`<th>#</th>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Estado</th>`;
+  const stMap={valid:'✓ Válido',invalid:'✗ Inválido',dup:'~ Duplicado'};
+  const stCls={valid:'td-ok',invalid:'td-danger',dup:'td-warn'};
+  document.getElementById('tableBody').innerHTML=list.slice(0,200).map((c,i)=>`
+    <tr><td>${i+1}</td>${cols.map(k=>`<td>${c[k]||'—'}</td>`).join('')}<td class="${stCls[c._status]||''}">${stMap[c._status]||c._status}</td></tr>
+  `).join('')+(list.length>200?`<tr><td colspan="${cols.length+2}" style="text-align:center;color:var(--muted);padding:12px">... y ${list.length-200} más</td></tr>`:'');
+}
+function resetImport(){S.contacts=[];S.validContacts=[];S.rawData=[];S.rawCols=[];S.colMap={};document.getElementById('importSummary').style.display='none';document.getElementById('mapperCard').style.display='none';updateContactCount();}
+function exportClean(){
+  const cols=Object.keys(S.colMap);
+  const data=[cols,...S.validContacts.map(c=>cols.map(k=>c[k]||''))];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),'Contactos_Limpios');
+  XLSX.writeFile(wb,'contactos_limpios.xlsx');
+}
+function updateContactCount(){
+  document.getElementById('contactCount').textContent=`${S.validContacts.length} contactos`;
+  document.getElementById('navBadge').textContent=S.validContacts.length;
+  document.getElementById('sSendTo').textContent=S.validContacts.length;
+}
+
+// ============================================================
+// PREFLIGHT
+// ============================================================
+function buildPreflight(){
+  const hasBackend=!!S.backendUrl;
+  const checks=[
+    {label:'Backend Railway configurado',ok:hasBackend,fix:'Ve a Configuración y pega la URL de Railway'},
+    {label:`${S.validContacts.length} contactos válidos`,ok:S.validContacts.length>0,fix:'Importa contactos en la sección Excel'},
+    {label:'Email remitente configurado',ok:!!document.getElementById('fromEmail').value,fix:'Completa el remitente en Redactar'},
+    {label:'Asunto definido',ok:!!document.getElementById('subject').value,fix:'Escribe el asunto en Redactar'},
+    {label:'Cuerpo del email con contenido',ok:document.getElementById('richEditor').innerText.trim().length>30,fix:'Escribe el cuerpo del email'},
+    {label:'Link de baja presente',ok:document.getElementById('richEditor').innerHTML.toLowerCase().includes('baja')||document.getElementById('richEditor').innerHTML.toLowerCase().includes('unsubscribe'),fix:'Agrega link de baja en el cuerpo'},
+  ];
+  document.getElementById('preflightList').innerHTML=checks.map(c=>`
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <div class="toggle-name" style="color:${c.ok?'var(--ok)':'var(--danger)'}">${c.ok?'✓':'✗'} ${c.label}</div>
+        ${!c.ok?`<div class="toggle-desc" style="color:var(--danger)">${c.fix}</div>`:''}
+      </div>
+      <span class="chip ${c.ok?'chip-ok':'chip-danger'}">${c.ok?'OK':'Pendiente'}</span>
+    </div>`).join('');
+  document.getElementById('sendBtn').disabled=!checks.every(c=>c.ok);
+}
+
+// ============================================================
+// SEND ENGINE — llama al backend real
+// ============================================================
+async function startSend(){
+  if(!confirm(`¿Enviar a ${S.validContacts.length} contactos reales vía backend?`))return;
+  S.sending=true;S.paused=false;S.stopped=false;S.sentCount=0;S.bounceCount=0;
+  document.getElementById('progWrap').style.display='block';
+  document.getElementById('sendLog').style.display='block';
+  document.getElementById('sendLog').innerHTML='';
+  document.getElementById('sendBtn').style.display='none';
+  document.getElementById('pauseBtn').style.display='inline-flex';
+  document.getElementById('stopBtn').style.display='inline-flex';
+
+  const contacts=S.validContacts;
+  const delay=parseInt(document.getElementById('sendDelay').value)||1500;
+  const batchSize=parseInt(document.getElementById('batchSize').value)||50;
+  const batchPause=parseInt(document.getElementById('batchPause').value)*1000||60000;
+  const humanize=document.getElementById('humanize').value==='true';
+  const validateMx=document.getElementById('validateMx').value==='true';
+
+  addLog('info','🚀 Iniciando envío real via backend...');
+
+  for(let i=0;i<contacts.length;i++){
+    if(S.stopped)break;
+    while(S.paused)await sleep(300);
+    if(S.stopped)break;
+
+    const contact=contacts[i];
+    const subject=personalize(document.getElementById('subject').value,contact);
+    const html=personalize(document.getElementById('richEditor').innerHTML,contact);
+    const text=personalize(document.getElementById('plainBody').value,contact);
+
+    try{
+      const res=await fetch(`${S.backendUrl}/send`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-secret':S.apiSecret},
+        body:JSON.stringify({
+          to:contact.email,
+          fromName:document.getElementById('fromName').value,
+          fromEmail:document.getElementById('fromEmail').value,
+          replyTo:document.getElementById('replyTo').value||undefined,
+          subject,html,text,
+          preheader:document.getElementById('preheader').value,
+          priority:document.getElementById('priority').value,
+          contact,validateMx,
+        })
+      });
+      const data=await res.json();
+      if(data.ok){
+        S.sentCount++;
+        addLog('ok',`✓ ${contact.email}${contact.nombre?' ('+contact.nombre+')':''} — ${data.messageId||'enviado'}`);
+      }else if(data.paused){
+        addLog('warn',`🛡 Backend pausado: ${data.reason}`);
+        S.stopped=true;break;
+      }else{
+        S.bounceCount++;
+        addLog('err',`✗ ${contact.email} — ${data.error||'error'}`);
+      }
+    }catch(err){
+      S.bounceCount++;
+      addLog('err',`✗ ${contact.email} — Error de conexión: ${err.message}`);
+    }
+
+    document.getElementById('sSent').textContent=S.sentCount;
+    document.getElementById('sBounce').textContent=S.bounceCount;
+    updateProgress(Math.round(((i+1)/contacts.length)*100),i+1,contacts.length);
+    updateSidebarMetrics();
+
+    const actualDelay=humanize?delay*(0.7+Math.random()*0.6):delay;
+    await sleep(actualDelay);
+
+    if(batchSize&&(i+1)%batchSize===0&&i<contacts.length-1){
+      addLog('info',`⏸ Pausa entre lotes (${batchPause/1000}s)...`);
+      await sleep(batchPause);
+    }
+  }
+
+  finishSend();
+}
+
+function personalize(template,contact){
+  let out=template||'';
+  Object.entries(contact).forEach(([k,v])=>{out=out.replace(new RegExp(`{{${k}}}`,`g`),v||'');});
+  return out;
+}
+
+function togglePause(){
+  S.paused=!S.paused;
+  document.getElementById('pauseBtn').textContent=S.paused?'▶ Reanudar':'⏸ Pausar';
+}
+function stopSend(){if(confirm('¿Detener envío?')){S.stopped=true;S.sending=false;finishSend();}}
+function finishSend(){
+  document.getElementById('sendBtn').style.display='inline-flex';
+  document.getElementById('pauseBtn').style.display='none';
+  document.getElementById('stopBtn').style.display='none';
+  addLog('ok',`✅ Finalizado: ${S.sentCount} enviados · ${S.bounceCount} bounces`);
+  document.getElementById('progFill').classList.add('ok');
+  fetchBackendStatus();
+}
+function updateProgress(pct,sent,total){
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progPct').textContent=pct+'%';
+  document.getElementById('progTxt').textContent=`${sent} de ${total}`;
+}
+function addLog(type,msg){
+  const d=document.createElement('div');d.className='log-line';
+  d.innerHTML=`<span class="log-ts">${new Date().toLocaleTimeString()}</span><span class="log-${type}">${msg}</span>`;
+  const el=document.getElementById('sendLog');el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+function updateSidebarMetrics(){
+  const br=S.sentCount>0?(S.bounceCount/S.sentCount*100):0;
+  document.getElementById('mBounceVal').textContent=br.toFixed(1)+'%';
+  document.getElementById('mBounceFill').style.width=Math.min((br/2)*100,100)+'%';
+  document.getElementById('mBounceFill').className='strike-fill '+(br<1?'sf-ok':br<2?'sf-warn':'sf-danger');
+  document.getElementById('mBounceVal').style.color=br<1?'var(--ok)':br<2?'var(--warn)':'var(--danger)';
+  document.getElementById('mSentVal').textContent=S.sentCount;
+  document.getElementById('mStatus').textContent=S.paused?'PAUSA':S.stopped?'DETENIDO':'ENVIANDO';
+}
+
+// ============================================================
+// BACKEND STATUS
+// ============================================================
+async function fetchBackendStatus(){
+  if(!S.backendUrl)return;
+  try{
+    const res=await fetch(`${S.backendUrl}/status`,{headers:{'x-api-secret':S.apiSecret}});
+    const data=await res.json();
+    if(data.ok){
+      const as=data.antiStrike;
+      document.getElementById('asBounce').textContent=as.bounceCount;
+      document.getElementById('asSpam').textContent=as.spamComplaints;
+      document.getElementById('asSentToday').textContent=as.sentToday;
+      document.getElementById('asDailyLimit').textContent=as.maxDaily;
+      const br=parseFloat(as.bounceRate)||0;
+      document.getElementById('asBounceFill').style.width=Math.min((br/2)*100,100)+'%';
+      document.getElementById('asBounceFill').className='as-fill '+(br<1?'sf-ok':br<1.5?'sf-warn':'sf-danger');
+      if(as.paused){
+        document.getElementById('asStatus').textContent='PAUSA';
+        document.getElementById('asStatus').style.color='var(--danger)';
+        document.getElementById('asStatusMsg').textContent=as.pauseReason;
+        document.getElementById('asStatusFill').style.background='var(--danger)';
+      }else{
+        document.getElementById('asStatus').textContent='OK ✓';
+        document.getElementById('asStatus').style.color='var(--ok)';
+        document.getElementById('asStatusMsg').textContent='Sistema operativo';
+        document.getElementById('asStatusFill').style.background='var(--ok)';
+        document.getElementById('asStatusFill').style.width='100%';
+      }
+      const dFill=as.maxDaily>0?(as.sentToday/as.maxDaily*100):0;
+      document.getElementById('asDailyFill').style.width=Math.min(dFill,100)+'%';
+    }
+  }catch(e){console.log('Backend no disponible:',e.message);}
+}
+
+async function resumeBackend(){
+  if(!S.backendUrl){alert('Configura el backend primero.');return;}
+  try{
+    const res=await fetch(`${S.backendUrl}/resume`,{method:'POST',headers:{'x-api-secret':S.apiSecret}});
+    const data=await res.json();
+    if(data.ok){alert('✅ Backend reanudado.');}
+    fetchBackendStatus();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ============================================================
+// BACKEND CONFIG
+// ============================================================
+function saveBackendConfig(){
+  S.backendUrl=document.getElementById('backendUrl').value.replace(/\/$/,'');
+  S.apiSecret=document.getElementById('apiSecret').value;
+  localStorage.setItem('inboxpro_backend',JSON.stringify({url:S.backendUrl,secret:S.apiSecret}));
+  showResult('backendTestResult','ok','✅ Configuración guardada.');
+  updateSmtpChip(true);
+}
+async function testBackend(){
+  const url=document.getElementById('backendUrl').value.replace(/\/$/,'');
+  if(!url){showResult('backendTestResult','warn','Escribe la URL del backend.');return;}
+  showResult('backendTestResult','info','🔌 Probando conexión...');
+  try{
+    const res=await fetch(url+'/',{signal:AbortSignal.timeout(8000)});
+    const data=await res.json();
+    showResult('backendTestResult','ok',`✅ Backend online — ${data.status}`);
+    updateSmtpChip(true);
+  }catch(e){showResult('backendTestResult','danger',`✗ Error: ${e.message}. Verifica que el backend esté deployado en Railway.`);}
+}
+function showResult(id,t,m){const el=document.getElementById(id);el.style.display='block';el.className=`alert alert-${t}`;el.innerHTML=m;}
+function updateSmtpChip(ok){
+  const c=document.getElementById('smtpChip');
+  if(ok){c.className='chip chip-ok';c.textContent='⬤ Backend OK';}
+  else{c.style.background='var(--dangerd)';c.style.borderColor='rgba(239,68,68,.3)';c.style.color='var(--danger)';c.textContent='⬤ Sin backend';}
+}
+
+// ============================================================
+// WARMUP
+// ============================================================
+function renderWarmup(){
+  const start=parseInt(document.getElementById('wuStart').value)||20;
+  const inc=(parseInt(document.getElementById('wuInc').value)||20)/100;
+  const days=parseInt(document.getElementById('wuDays').value)||21;
+  let cur=start,html='';
+  for(let d=1;d<=days;d++){
+    const val=Math.round(cur);
+    const intensity=Math.min(val/500,1);
+    const color=`hsl(${210+intensity*40},80%,${60-intensity*20}%)`;
+    html+=`<div class="wuday"><div class="wuday-num">D${d}</div><div class="wuday-val" style="color:${color}">${val}</div></div>`;
+    cur*=(1+inc);
+  }
+  document.getElementById('wuCalendar').innerHTML=html;
+  document.getElementById('wuFinal').textContent=Math.round(cur)+'/día';
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+// ============================================================
+// INIT
+// ============================================================
+window.onload=function(){
+  const saved=localStorage.getItem('inboxpro_backend');
+  if(saved){
+    const cfg=JSON.parse(saved);
+    S.backendUrl=cfg.url||'';S.apiSecret=cfg.secret||'';
+    document.getElementById('backendUrl').value=S.backendUrl;
+    document.getElementById('apiSecret').value=S.apiSecret;
+    if(S.backendUrl)updateSmtpChip(true);
+  }
+  scoreUpdate();
+  renderWarmup();
+};
+</script>
+</body>
+</html>
