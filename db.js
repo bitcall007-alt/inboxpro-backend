@@ -9,7 +9,7 @@ const { Pool } = require('pg');
 // Neon / Railway inyectan DATABASE_URL automáticamente
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: { rejectUnauthorized: process.env.PGSSL_REJECT_UNAUTHORIZED !== 'false' },
 });
 
 // ============================================================
@@ -62,8 +62,9 @@ async function getState() {
   const { rows } = await pool.query(`SELECT * FROM anti_strike_state WHERE id = 1;`);
   let state = rows[0];
 
-  const today = new Date().toISOString().slice(0, 10);
-  const lastReset = state.last_reset.toISOString().slice(0, 10);
+  const { rows: dateRows } = await pool.query('SELECT CURRENT_DATE::text AS today;');
+  const today = dateRows[0].today;
+  const lastReset = String(state.last_reset).slice(0, 10);
 
   if (lastReset !== today) {
     // Nuevo día → reinicia sentToday y bounceCount, pero NO total_sent (histórico permanece)
@@ -135,10 +136,11 @@ async function logEvent({ type, email, messageId, errorCode, errorMsg }) {
 }
 
 async function getRecentHistory(limit = 100) {
+  const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 100, 1), 200);
   const { rows } = await pool.query(`
     SELECT type, email, message_id, error_code, error_msg, created_at
     FROM send_history ORDER BY created_at DESC LIMIT $1;
-  `, [limit]);
+  `, [safeLimit]);
   return rows;
 }
 
@@ -167,3 +169,4 @@ module.exports = {
   getRecentHistory,
   checkDbConnection,
 };
+
