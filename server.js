@@ -330,7 +330,7 @@ app.post('/send', requireAuth, async (req, res) => {
 });
 
 app.post('/send-bulk', requireAuth, async (req, res) => {
-  const {
+  let {
     contacts, subject, html, text, fromName, fromEmail, replyTo,
     priority, preheader, delayMs = 1500, humanize = true,
     validateMx = true, batchSize = 50, batchPauseMs = 60000,
@@ -350,6 +350,12 @@ app.post('/send-bulk', requireAuth, async (req, res) => {
   if (contacts.length > maxPerReq) {
     return res.status(400).json({ ok: false, error: `Máximo ${maxPerReq} contactos por request.` });
   }
+  if (contacts.some(contact => !contact || !isEmail(String(contact.email || '').trim()))) {
+    return res.status(400).json({ ok: false, error: 'Todos los contactos deben tener un email válido.' });
+  }
+  delayMs = Math.min(Math.max(Number.parseInt(delayMs, 10) || 1500, 250), 60_000);
+  batchSize = Math.min(Math.max(Number.parseInt(batchSize, 10) || 50, 1), 100);
+  batchPauseMs = Math.min(Math.max(Number.parseInt(batchPauseMs, 10) || 60_000, 0), 900_000);
 
   const jobId = crypto.randomBytes(6).toString('hex');
   res.json({ ok: true, jobId, message: `Job ${jobId} iniciado. ${contacts.length} emails en cola.` });
