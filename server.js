@@ -242,7 +242,7 @@ async function sendSingle(mailOptions) {
     if (code >= 550 && code <= 554) {
       await db.incrementBounce();
       await db.logEvent({ type: 'bounce', email: mailOptions.to, errorCode: code, errorMsg: err.message });
-      return { ok: false, bounce: true, error: err.message, code };
+      return { ok: false, bounce: true, error: 'Entrega rechazada por el servidor SMTP.', code };
     }
 
     throw err;
@@ -300,6 +300,9 @@ app.post('/send', requireAuth, async (req, res) => {
   if (!isEmail(to) || !isEmail(fromEmail) || (replyTo && !isEmail(replyTo))) {
     return res.status(400).json({ ok: false, error: 'Dirección de email inválida.' });
   }
+  if ([subject, fromName, fromEmail, replyTo, preheader].some(hasHeaderBreaks)) {
+    return res.status(400).json({ ok: false, error: 'Los campos contienen saltos de línea no permitidos.' });
+  }
   if (String(subject).length > 120 || String(html || '').length > 2_000_000 || String(text || '').length > 500_000) {
     return res.status(400).json({ ok: false, error: 'El asunto o el cuerpo supera el tamaño permitido.' });
   }
@@ -322,7 +325,7 @@ app.post('/send', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[Send Error]', err.message);
-    res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: 'Error interno al enviar el correo.' });
   }
 });
 
@@ -338,6 +341,9 @@ app.post('/send-bulk', requireAuth, async (req, res) => {
   }
   if (!fromEmail || !isEmail(fromEmail) || !subject || String(subject).length > 120) {
     return res.status(400).json({ ok: false, error: 'Remitente o asunto inválido.' });
+  }
+  if ([subject, fromName, fromEmail, replyTo, preheader].some(hasHeaderBreaks)) {
+    return res.status(400).json({ ok: false, error: 'Los campos contienen saltos de línea no permitidos.' });
   }
 
   const maxPerReq = parseInt(process.env.MAX_EMAILS_PER_REQUEST) || 500;
@@ -419,6 +425,9 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function isEmail(value) {
   return typeof value === 'string' && value.length <= 320 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+}
+function hasHeaderBreaks(value) {
+  return typeof value === 'string' && /[\r\n]/.test(value);
 }
 
 // ============================================================
