@@ -638,6 +638,9 @@ function dzLeave(){document.getElementById('dropzone').classList.remove('drag')}
 function dzDrop(e){e.preventDefault();dzLeave();if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0])}
 function fileSelected(input){if(input.files[0])readFile(input.files[0])}
 function readFile(file){
+  const allowedTypes=['text/csv','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+  if(file.size>10*1024*1024){alert('El archivo supera el límite de 10 MB.');return;}
+  if(file.type && !allowedTypes.includes(file.type) && !/\.(csv|xls|xlsx)$/i.test(file.name)){alert('Formato no permitido. Usa CSV, XLS o XLSX.');return;}
   const r=new FileReader();
   r.onload=e=>{
     const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
@@ -658,7 +661,7 @@ function renderMapper(){
     <div class="col-map-item"><div class="col-map-label">${f.toUpperCase()}</div>
     <select class="col-map-select" id="map_${f}">
       <option value="">-- No mapear --</option>
-      ${S.rawCols.map((c,i)=>`<option value="${i}" ${autoMatch(c,f)?'selected':''}>${c}</option>`).join('')}
+      ${S.rawCols.map((c,i)=>`<option value="${i}" ${autoMatch(c,f)?'selected':''}>${escapeHtml(c)}</option>`).join('')}
     </select></div>`).join('');
 }
 function autoMatch(col,field){
@@ -701,11 +704,11 @@ function renderTable(mode){
   const list=mode==='all'?S.contacts:mode==='valid'?S.contacts.filter(c=>c._status==='valid'):S.contacts.filter(c=>c._status!=='valid');
   const cols=Object.keys(S.colMap).filter(k=>k!=='_status');
   if(!cols.includes('email'))cols.unshift('email');
-  document.getElementById('tableHead').innerHTML=`<th>#</th>${cols.map(c=>`<th>${c}</th>`).join('')}<th>Estado</th>`;
+  document.getElementById('tableHead').innerHTML=`<th>#</th>${cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th>Estado</th>`;
   const stMap={valid:'✓ Válido',invalid:'✗ Inválido',dup:'~ Duplicado'};
   const stCls={valid:'td-ok',invalid:'td-danger',dup:'td-warn'};
   document.getElementById('tableBody').innerHTML=list.slice(0,200).map((c,i)=>`
-    <tr><td>${i+1}</td>${cols.map(k=>`<td>${c[k]||'—'}</td>`).join('')}<td class="${stCls[c._status]||''}">${stMap[c._status]||c._status}</td></tr>
+     <tr><td>${i+1}</td>${cols.map(k=>`<td>${escapeHtml(c[k]||'—')}</td>`).join('')}<td class="${stCls[c._status]||''}">${stMap[c._status]||escapeHtml(c._status)}</td></tr>
   `).join('')+(list.length>200?`<tr><td colspan="${cols.length+2}" style="text-align:center;color:var(--muted);padding:12px">... y ${list.length-200} más</td></tr>`:'');
 }
 function resetImport(){S.contacts=[];S.validContacts=[];S.rawData=[];S.rawCols=[];S.colMap={};document.getElementById('importSummary').style.display='none';document.getElementById('mapperCard').style.display='none';updateContactCount();}
@@ -775,7 +778,7 @@ async function startSend(){
 
     const contact=contacts[i];
     const subject=personalize(document.getElementById('subject').value,contact);
-    const html=personalize(document.getElementById('richEditor').innerHTML,contact);
+     const html=personalize(document.getElementById('richEditor').innerHTML,contact,true);
     const text=personalize(document.getElementById('plainBody').value,contact);
 
     try{
@@ -826,9 +829,12 @@ async function startSend(){
   finishSend();
 }
 
-function personalize(template,contact){
+function personalize(template,contact,escapeValues=false){
   let out=template||'';
-  Object.entries(contact).forEach(([k,v])=>{out=out.replace(new RegExp(`{{${k}}}`,`g`),v||'');});
+  Object.entries(contact).forEach(([k,v])=>{
+    const value=escapeValues?escapeHtml(v||''):String(v||'');
+    out=out.replace(new RegExp(`{{${k}}}`,`g`),value);
+  });
   return out;
 }
 
@@ -852,7 +858,7 @@ function updateProgress(pct,sent,total){
 }
 function addLog(type,msg){
   const d=document.createElement('div');d.className='log-line';
-  d.innerHTML=`<span class="log-ts">${new Date().toLocaleTimeString()}</span><span class="log-${type}">${msg}</span>`;
+  d.innerHTML=`<span class="log-ts">${new Date().toLocaleTimeString()}</span><span class="log-${type}">${escapeHtml(msg)}</span>`;
   const el=document.getElementById('sendLog');el.appendChild(d);el.scrollTop=el.scrollHeight;
 }
 function updateSidebarMetrics(){
@@ -916,7 +922,7 @@ async function resumeBackend(){
 function saveBackendConfig(){
   S.backendUrl=document.getElementById('backendUrl').value.replace(/\/$/,'');
   S.apiSecret=document.getElementById('apiSecret').value;
-  localStorage.setItem('inboxpro_backend',JSON.stringify({url:S.backendUrl,secret:S.apiSecret}));
+  localStorage.setItem('inboxpro_backend',JSON.stringify({url:S.backendUrl}));
   showResult('backendTestResult','ok','✅ Configuración guardada.');
   updateSmtpChip(true);
 }
@@ -931,7 +937,7 @@ async function testBackend(){
     updateSmtpChip(true);
   }catch(e){showResult('backendTestResult','danger',`✗ Error: ${e.message}. Verifica que el backend esté deployado en Railway.`);}
 }
-function showResult(id,t,m){const el=document.getElementById(id);el.style.display='block';el.className=`alert alert-${t}`;el.innerHTML=m;}
+function showResult(id,t,m){const el=document.getElementById(id);el.style.display='block';el.className=`alert alert-${t}`;el.textContent=m;}
 function updateSmtpChip(ok){
   const c=document.getElementById('smtpChip');
   if(ok){c.className='chip chip-ok';c.textContent='⬤ Backend OK';}
@@ -961,22 +967,28 @@ function renderWarmup(){
 // UTILS
 // ============================================================
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+function escapeHtml(value){
+  return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
 
 // ============================================================
 // INIT
 // ============================================================
 window.onload=function(){
-  const saved=localStorage.getItem('inboxpro_backend');
-  if(saved){
-    const cfg=JSON.parse(saved);
-    S.backendUrl=cfg.url||'';S.apiSecret=cfg.secret||'';
-    document.getElementById('backendUrl').value=S.backendUrl;
-    document.getElementById('apiSecret').value=S.apiSecret;
-    if(S.backendUrl)updateSmtpChip(true);
-  }
+  try{
+    const saved=localStorage.getItem('inboxpro_backend');
+    if(saved){
+      const cfg=JSON.parse(saved);
+      S.backendUrl=cfg.url||'';S.apiSecret='';
+      document.getElementById('backendUrl').value=S.backendUrl;
+      document.getElementById('apiSecret').value='';
+      if(S.backendUrl)updateSmtpChip(true);
+    }
+  }catch(e){localStorage.removeItem('inboxpro_backend');}
   scoreUpdate();
   renderWarmup();
 };
 </script>
 </body>
 </html>
+
