@@ -25,6 +25,14 @@ un bloqueo permanente en Brevo.
 3. Al iniciar, el backend crea automáticamente las tablas necesarias
    (`anti_strike_state` y `send_history`) — no hay pasos manuales de SQL.
 
+## Requisitos de seguridad
+
+- `API_SECRET` es obligatorio para todas las rutas de envío, estado, historial y webhooks. No lo dejes vacío.
+- Configura `ALLOWED_ORIGINS` con el origen exacto del frontend; no uses `*`.
+- El webhook `/webhook/complaint` también requiere el header `x-api-secret`.
+- El frontend no guarda el secreto en `localStorage`; hay que introducirlo de nuevo al abrir la aplicación.
+- El historial está limitado a 200 eventos por consulta y las entradas se validan antes de enviarse.
+
 ## Verificar que la persistencia funciona
 
 Abre la URL de tu backend en el navegador. Si ves:
@@ -40,3 +48,4 @@ PostgreSQL en Railway.
 
 - `GET /history` — últimos 100 eventos (envíos, bounces, complaints) con timestamp,
   útil para auditar qué pasó incluso después de reinicios.
+
