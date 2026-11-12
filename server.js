@@ -22,10 +22,11 @@ const PORT = process.env.PORT || 3000;
 // ============================================================
 app.use(express.json({ limit: '10mb' }));
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',').map(value => value.trim()).filter(Boolean);
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) cb(null, true);
+    if (!origin || allowedOrigins.includes(origin)) cb(null, true);
     else cb(new Error(`CORS bloqueado: ${origin}`));
   },
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -41,9 +42,12 @@ app.use('/send', limiter);
 app.use('/send-bulk', limiter);
 
 function requireAuth(req, res, next) {
-  const secret = process.env.API_SECRET;
-  if (!secret) return next();
-  if (req.headers['x-api-secret'] !== secret) {
+  const secret = process.env.API_SECRET?.trim();
+  if (!secret) return res.status(503).json({ ok: false, error: 'API_SECRET no configurado.' });
+  const supplied = String(req.headers['x-api-secret'] || '');
+  const valid = supplied.length === secret.length &&
+    crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(secret));
+  if (!valid) {
     return res.status(401).json({ ok: false, error: 'No autorizado.' });
   }
   next();
@@ -250,12 +254,10 @@ async function sendSingle(mailOptions) {
 // ============================================================
 app.get('/', async (req, res) => {
   const dbOk = await db.checkDbConnection();
-  const state = dbOk ? await db.getState() : null;
   res.json({
     status: 'InboxPro Backend v2.1 funcionando',
     database: dbOk ? 'conectada ✓ (estado persistente)' : 'DESCONECTADA ⚠️ (configura DATABASE_URL)',
-    smtp: smtpConfigs.map(c => ({ name: c.name, host: c.host })),
-    antiStrike: state || { warning: 'Sin DB, no se puede leer el estado real.' },
+    smtpConfigured: smtpConfigs.length,
   });
 });
 
@@ -278,7 +280,8 @@ app.get('/status', requireAuth, async (req, res) => {
 });
 
 app.get('/history', requireAuth, async (req, res) => {
-  const limit = parseInt(req.query.limit) || 100;
+  const requestedLimit = Number.parseInt(req.query.limit, 10);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 200) : 100;
   const history = await db.getRecentHistory(limit);
   res.json({ ok: true, history });
 });
@@ -293,6 +296,12 @@ app.post('/send', requireAuth, async (req, res) => {
 
   if (!to || !subject || !fromEmail) {
     return res.status(400).json({ ok: false, error: 'Faltan campos: to, subject, fromEmail.' });
+  }
+  if (!isEmail(to) || !isEmail(fromEmail) || (replyTo && !isEmail(replyTo))) {
+    return res.status(400).json({ ok: false, error: 'Dirección de email inválida.' });
+  }
+  if (String(subject).length > 120 || String(html || '').length > 2_000_000 || String(text || '').length > 500_000) {
+    return res.status(400).json({ ok: false, error: 'El asunto o el cuerpo supera el tamaño permitido.' });
   }
 
   const asCheck = await checkAntiStrike();
@@ -326,6 +335,9 @@ app.post('/send-bulk', requireAuth, async (req, res) => {
 
   if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
     return res.status(400).json({ ok: false, error: 'contacts debe ser un array no vacío.' });
+  }
+  if (!fromEmail || !isEmail(fromEmail) || !subject || String(subject).length > 120) {
+    return res.status(400).json({ ok: false, error: 'Remitente o asunto inválido.' });
   }
 
   const maxPerReq = parseInt(process.env.MAX_EMAILS_PER_REQUEST) || 500;
@@ -384,7 +396,7 @@ app.post('/send-bulk', requireAuth, async (req, res) => {
   })();
 });
 
-app.post('/webhook/complaint', async (req, res) => {
+app.post('/webhook/complaint', requireAuth, async (req, res) => {
   const events = Array.isArray(req.body) ? req.body : [req.body];
   for (const e of events) {
     if (e.event === 'spam' || e.event === 'complaint') {
@@ -404,6 +416,10 @@ app.post('/webhook/complaint', async (req, res) => {
 // UTILS
 // ============================================================
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function isEmail(value) {
+  return typeof value === 'string' && value.length <= 320 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+}
 
 // ============================================================
 // START — inicializa la DB ANTES de aceptar tráfico
@@ -436,3 +452,4 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     `);
   });
 })();
+
