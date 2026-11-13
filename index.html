@@ -214,9 +214,26 @@ input:checked+.slider::before{transform:translateX(18px);background:#fff}
   .main{grid-row:3}
   .fg2,.fg3,.as-grid,.sum-grid{grid-template-columns:1fr}
 }
+
+.login-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(8,10,15,.96);backdrop-filter:blur(10px)}
+.login-card{width:min(100%,400px);display:flex;flex-direction:column;gap:12px;padding:28px;background:var(--s1);border:1px solid var(--border);border-radius:14px;box-shadow:0 24px 80px rgba(0,0,0,.55)}
+.login-card .logo-mark{margin:0 auto}.login-card h1,.login-card p{text-align:center}.login-card h1{font-size:22px}.login-card p{color:var(--muted);font-size:13px;margin-bottom:8px}
+.login-card label{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.login-card input{background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:11px 12px;font-size:14px}
+#loginError{min-height:18px;color:var(--danger);font-size:12px}
 </style>
 </head>
 <body>
+<div id="loginOverlay" class="login-overlay">
+  <form id="loginForm" class="login-card">
+    <div class="logo-mark">✉</div><h1>InboxPro</h1>
+    <p>Inicia sesión en tu espacio privado.</p>
+    <label for="loginBackendUrl">URL del backend</label><input id="loginBackendUrl" type="url" placeholder="https://tu-servicio.onrender.com" required>
+    <label for="loginUsername">Usuario</label><input id="loginUsername" autocomplete="username" value="malik" required>
+    <label for="loginPassword">Contraseña</label><input id="loginPassword" type="password" autocomplete="current-password" required>
+    <div id="loginError" role="alert"></div><button type="submit" class="btn btn-primary">Entrar</button>
+  </form>
+</div>
 <div class="shell">
 
 <!-- TOPBAR -->
@@ -492,14 +509,13 @@ input:checked+.slider::before{transform:translateX(18px);background:#fff}
 
 <!-- SETTINGS -->
 <div class="page" id="page-settings">
-  <div class="ph"><div class="ph-title">⚙️ Configuración</div><div class="ph-sub">Conecta tu backend Railway · configura credenciales</div></div>
+  <div class="ph"><div class="ph-title">⚙️ Configuración</div><div class="ph-sub">Conecta el backend gratuito · administra tu sesión</div></div>
 
   <div class="card">
-    <div class="card-hd"><div class="card-hd-dot"></div>Backend URL (Railway)</div>
-    <div class="alert alert-info">🚀 Despliega el backend en Railway y pega aquí la URL que te dé. Ej: <code>https://inboxpro-backend.up.railway.app</code></div>
+    <div class="card-hd"><div class="card-hd-dot"></div>Backend URL</div>
+    <div class="alert alert-info">Pega la URL del servicio backend de Render. Accede con tu usuario y contraseña.</div>
     <div class="fg">
       <div class="field"><label>URL del backend</label><input type="text" id="backendUrl" placeholder="https://tu-proyecto.up.railway.app" /></div>
-      <div class="field"><label>API Secret (mismo que en .env)</label><input type="password" id="apiSecret" placeholder="tu_clave_secreta" /></div>
     </div>
     <div id="backendTestResult" style="display:none;margin-bottom:12px"></div>
     <div class="btn-row">
@@ -509,7 +525,7 @@ input:checked+.slider::before{transform:translateX(18px);background:#fff}
   </div>
 
   <div class="card">
-    <div class="card-hd"><div class="card-hd-dot"></div>Guía de deploy en Railway — paso a paso</div>
+    <div class="card-hd"><div class="card-hd-dot"></div>Despliegue gratuito</div>
     <div style="display:flex;flex-direction:column;gap:14px;font-size:13px">
       <div style="display:flex;gap:12px;align-items:flex-start">
         <span style="background:var(--a1);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">1</span>
@@ -521,24 +537,24 @@ input:checked+.slider::before{transform:translateX(18px);background:#fff}
       </div>
       <div style="display:flex;gap:12px;align-items:flex-start">
         <span style="background:var(--a1);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">3</span>
-        <div><strong>Deploy en Railway</strong><br><span style="color:var(--muted);font-size:12px">railway.app → New Project → Deploy from GitHub → selecciona tu repo → Railway detecta Node.js automáticamente</span></div>
+        <div><strong>Deploy en Render Free</strong><br><span style="color:var(--muted);font-size:12px">railway.app → New Project → Deploy from GitHub → selecciona tu repo → Render detecta Node.js automáticamente</span></div>
       </div>
       <div style="display:flex;gap:12px;align-items:flex-start">
         <span style="background:var(--a1);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">4</span>
-        <div><strong>Configura variables de entorno en Railway</strong><br>
+        <div><strong>Configura variables de entorno en Render</strong><br>
           <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px;font-family:var(--mono);font-size:11px;color:var(--a2)">
-            SMTP_HOST=smtp-relay.brevo.com<br>
-            SMTP_PORT=587<br>
-            SMTP_USER=tu@email.com<br>
-            SMTP_PASS=tu_api_key_brevo<br>
-            API_SECRET=clave_secreta_larga<br>
-            ALLOWED_ORIGINS=https://tu-frontend.netlify.app
+            BREVO_API_KEY=clave_api_de_brevo<br>
+            APP_USERNAME=malik<br>
+            APP_PASSWORD=tu_clave_privada<br>
+            SESSION_SECRET=una_clave_aleatoria<br>
+            DATABASE_URL=Neon<br>
+            ALLOWED_ORIGINS=https://bitcall007-alt.github.io
           </div>
         </div>
       </div>
       <div style="display:flex;gap:12px;align-items:flex-start">
         <span style="background:var(--ok);color:#fff;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;flex-shrink:0;font-weight:700">5</span>
-        <div><strong>Copia la URL de Railway y pégala arriba</strong><br><span style="color:var(--muted);font-size:12px">Railway te da una URL tipo: https://inboxpro-xxxxx.up.railway.app — pégala en el campo Backend URL</span></div>
+        <div><strong>Copia la URL de Render y pégala arriba</strong><br><span style="color:var(--muted);font-size:12px">Render te da una URL tipo: https://inboxpro.onrender.com — pégala en el campo Backend URL</span></div>
       </div>
     </div>
   </div>
@@ -555,8 +571,11 @@ const S = {
   contacts:[], validContacts:[], rawCols:[], rawData:[], colMap:{},
   sending:false, paused:false, stopped:false,
   sentCount:0, bounceCount:0, sentToday:0,
-  backendUrl:'', apiSecret:'',
+  backendUrl:'',
 };
+
+let authToken = '';
+function apiFetch(path,options={}){const headers=new Headers(options.headers||{});if(authToken)headers.set('Authorization',`Bearer ${authToken}`);return fetch(`${S.backendUrl}${path}`,{...options,headers});}
 
 const SPAM_WDS = ['gratis','free','garantizado','urgente','100%','click aquí','gana dinero','winner','prize','cash','felicitaciones'];
 const ROLE_EMAILS = ['info@','admin@','support@','contact@','hello@','sales@','noreply@','no-reply@','postmaster@','webmaster@'];
@@ -731,7 +750,7 @@ function updateContactCount(){
 function buildPreflight(){
   const hasBackend=!!S.backendUrl;
   const checks=[
-    {label:'Backend Railway configurado',ok:hasBackend,fix:'Ve a Configuración y pega la URL de Railway'},
+    {label:'Backend Render configurado',ok:hasBackend,fix:'Ve a Configuración y pega la URL de Render'},
     {label:`${S.validContacts.length} contactos válidos`,ok:S.validContacts.length>0,fix:'Importa contactos en la sección Excel'},
     {label:'Email remitente configurado',ok:!!document.getElementById('fromEmail').value,fix:'Completa el remitente en Redactar'},
     {label:'Asunto definido',ok:!!document.getElementById('subject').value,fix:'Escribe el asunto en Redactar'},
@@ -782,9 +801,9 @@ async function startSend(){
     const text=personalize(document.getElementById('plainBody').value,contact);
 
     try{
-      const res=await fetch(`${S.backendUrl}/send`,{
+      const res=await apiFetch('/send',{
         method:'POST',
-        headers:{'Content-Type':'application/json','x-api-secret':S.apiSecret},
+        headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           to:contact.email,
           fromName:document.getElementById('fromName').value,
@@ -877,7 +896,7 @@ function updateSidebarMetrics(){
 async function fetchBackendStatus(){
   if(!S.backendUrl)return;
   try{
-    const res=await fetch(`${S.backendUrl}/status`,{headers:{'x-api-secret':S.apiSecret}});
+    const res=await apiFetch('/status');
     const data=await res.json();
     if(data.ok){
       const as=data.antiStrike;
@@ -909,19 +928,34 @@ async function fetchBackendStatus(){
 async function resumeBackend(){
   if(!S.backendUrl){alert('Configura el backend primero.');return;}
   try{
-    const res=await fetch(`${S.backendUrl}/resume`,{method:'POST',headers:{'x-api-secret':S.apiSecret}});
+    const res=await apiFetch('/resume',{method:'POST'});
     const data=await res.json();
     if(data.ok){alert('✅ Backend reanudado.');}
     fetchBackendStatus();
   }catch(e){alert('Error: '+e.message);}
 }
 
+async function loginApp(event){
+  event.preventDefault();
+  const url=document.getElementById('loginBackendUrl').value.trim().replace(/\/$/,'');
+  const username=document.getElementById('loginUsername').value.trim();
+  const password=document.getElementById('loginPassword').value;
+  const err=document.getElementById('loginError');err.textContent='';
+  try{
+    const res=await fetch(`${url}/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password}),signal:AbortSignal.timeout(12000)});
+    const data=await res.json();if(!res.ok||!data.ok)throw new Error(data.error||`HTTP ${res.status}`);
+    S.backendUrl=url;authToken=data.token;localStorage.setItem('inboxpro_backend',JSON.stringify({url}));
+    document.getElementById('backendUrl').value=url;document.getElementById('loginPassword').value='';
+    document.getElementById('loginOverlay').style.display='none';updateSmtpChip(true);fetchBackendStatus();
+  }catch(e){err.textContent=`No se pudo iniciar sesión: ${e.message}`;}
+}
+function logoutApp(){authToken='';document.getElementById('loginOverlay').style.display='grid';document.getElementById('loginPassword').value='';}
+
 // ============================================================
 // BACKEND CONFIG
 // ============================================================
 function saveBackendConfig(){
   S.backendUrl=document.getElementById('backendUrl').value.replace(/\/$/,'');
-  S.apiSecret=document.getElementById('apiSecret').value;
   localStorage.setItem('inboxpro_backend',JSON.stringify({url:S.backendUrl}));
   showResult('backendTestResult','ok','✅ Configuración guardada.');
   updateSmtpChip(true);
@@ -936,7 +970,7 @@ async function testBackend(){
     if(!res.ok||!data.database?.includes('conectada'))throw new Error(data.database||`HTTP ${res.status}`);
     showResult('backendTestResult','ok',`✅ Backend online — ${data.status}`);
     updateSmtpChip(true);
-  }catch(e){updateSmtpChip(false);showResult('backendTestResult','danger',`✗ Error: ${e.message}. Verifica Railway y que PostgreSQL esté conectado.`);}
+  }catch(e){updateSmtpChip(false);showResult('backendTestResult','danger',`✗ Error: ${e.message}. Verifica Render y que PostgreSQL esté conectado.`);}
 }
 function showResult(id,t,m){const el=document.getElementById(id);el.style.display='block';el.className=`alert alert-${t}`;el.textContent=m;}
 function updateSmtpChip(ok){
@@ -976,14 +1010,14 @@ function escapeHtml(value){
 // INIT
 // ============================================================
 window.onload=function(){
+  document.getElementById('loginForm').addEventListener('submit',loginApp);
   try{
     const saved=localStorage.getItem('inboxpro_backend');
     if(saved){
       const cfg=JSON.parse(saved);
-      S.backendUrl=cfg.url||'';S.apiSecret='';
+      S.backendUrl=cfg.url||'';document.getElementById('loginBackendUrl').value=S.backendUrl;
       document.getElementById('backendUrl').value=S.backendUrl;
-      document.getElementById('apiSecret').value='';
-      if(S.backendUrl)updateSmtpChip(true);
+      if(S.backendUrl)updateSmtpChip(false);
     }
   }catch(e){localStorage.removeItem('inboxpro_backend');}
   scoreUpdate();

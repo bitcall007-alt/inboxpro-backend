@@ -1,53 +1,36 @@
-# InboxPro Backend v2.2 — FIX: Anti-Strike Persistente
+# InboxPro Backend v2.3
 
-## ⚠️ Qué se arregló respecto a v2.0
+InboxPro is a small email campaign interface with a Node.js API, PostgreSQL persistence, and a single-user login.
 
-**Bug crítico anterior:** el contador de bounces, spam complaints y envíos
-diarios vivía en una variable de JavaScript en memoria (`antiStrike = {...}`).
-Cada vez que Railway reiniciaba el contenedor (deploy, sleep por inactividad,
-crash, mantenimiento), ese contador volvía a cero — el sistema "olvidaba"
-que estaba cerca del límite de bounce rate y seguía enviando, arriesgando
-un bloqueo permanente en Brevo.
+## Free deployment
 
-**Solución:** todo el estado anti-strike ahora vive en **PostgreSQL**
-(plugin gratuito de Railway). Sobrevive a cualquier reinicio.
+- Frontend: GitHub Pages from this repository.
+- Backend: Render Free web service. Free instances sleep after 15 minutes without traffic and can take about a minute to wake.
+- Database: Neon Free PostgreSQL. The free plan has a monthly compute allowance and storage cap; the database can scale to zero.
+- Email: Brevo Free API, up to 300 sends per day. Render Free blocks SMTP ports, so configure `BREVO_API_KEY` to send mail from Render.
 
-## Qué cambia para ti al desplegar
+These free plans have usage limits and do not provide production uptime guarantees. Do not add a payment method if you need to prevent accidental charges; services may pause at their free limits.
 
-1. En Railway, antes de configurar las variables de entorno, agrega
-   el plugin de base de datos:
-   - En tu proyecto Railway → clic en **"New"** → **"Database"** → **"Add PostgreSQL"**
-   - Railway crea la base de datos e inyecta automáticamente la variable
-     `DATABASE_URL` en tu servicio backend. **No la escribas a mano.**
+## Deploy the backend
 
-2. El resto del proceso es idéntico al manual que ya tienes (Parte 3).
+1. Create a free Render Web Service from `bitcall007-alt/inboxpro-backend`, using the `main` branch. Build command: `npm install`. Start command: `npm start`. Select the Free instance type.
+2. Create a free PostgreSQL project on Neon and copy its connection string into Render as `DATABASE_URL`.
+3. Add these variables in the Render service settings. Never commit their values to GitHub:
 
-3. Al iniciar, el backend crea automáticamente las tablas necesarias
-   (`anti_strike_state` y `send_history`) — no hay pasos manuales de SQL.
-   Si PostgreSQL no está configurado o no responde, el servicio no arrancará
-   ni aceptará envíos hasta recuperar la persistencia.
+   - `APP_USERNAME=malik`
+   - `APP_PASSWORD`: set a private password in Render's environment settings.
+   - `SESSION_SECRET`: set a long random secret.
+   - `DATABASE_URL`: Neon connection string.
+   - `BREVO_API_KEY`: Brevo API key.
+   - `ALLOWED_ORIGINS=https://bitcall007-alt.github.io`
+   - `MAX_DAILY_EMAILS=300`
+   - `API_SECRET`: only needed if using the complaint webhook.
 
-## Requisitos de seguridad
+4. Deploy. The backend only starts when PostgreSQL is connected and initializes its tables automatically.
+5. Open the GitHub Pages frontend, enter the Render service URL and sign in. The app keeps the backend URL in local storage; the session token stays in memory and expires after 12 hours.
 
-- `API_SECRET` es obligatorio para todas las rutas de envío, estado, historial y webhooks. No lo dejes vacío.
-- Configura `ALLOWED_ORIGINS` con el origen exacto del frontend; no uses `*`.
-- El webhook `/webhook/complaint` también requiere el header `x-api-secret`.
-- El frontend no guarda el secreto en `localStorage`; hay que introducirlo de nuevo al abrir la aplicación.
-- El historial está limitado a 200 eventos por consulta y las entradas se validan antes de enviarse.
+## Security and persistence
 
-## Verificar que la persistencia funciona
+The login endpoint is rate limited. Protected API routes require a signed, expiring session token. The app password, session signing key, Brevo key, and database connection string belong only in the hosting provider's environment settings. The complaint webhook uses `API_SECRET` when enabled.
 
-Abre la URL de tu backend en el navegador. Si ves:
-
-```json
-"database": "conectada ✓ (estado persistente)"
-```
-
-la persistencia está activa. Si recibes HTTP 503 o ves `"DESCONECTADA ⚠️"`, falta el plugin
-PostgreSQL en Railway o la base de datos no está disponible.
-
-## Nuevas rutas
-
-- `GET /history` — últimos 100 eventos (envíos, bounces, complaints) con timestamp,
-  útil para auditar qué pasó incluso después de reinicios.
-
+Anti-strike counters are persisted in PostgreSQL. Lifetime bounces are tracked separately from the daily count so the bounce-rate calculation does not reset each day. If PostgreSQL is missing or unavailable during startup, the backend exits rather than accepting sends without persistence.

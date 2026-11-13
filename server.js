@@ -17,6 +17,9 @@ const db         = require('./db');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 let databaseReady = false;
+const APP_USERNAME = process.env.APP_USERNAME || '';
+const APP_PASSWORD = process.env.APP_PASSWORD || '';
+const SESSION_SECRET = process.env.SESSION_SECRET || '';
 
 // ============================================================
 // MIDDLEWARE
@@ -31,7 +34,7 @@ app.use(cors({
     else cb(new Error(`CORS bloqueado: ${origin}`));
   },
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-api-secret'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-secret'],
 }));
 
 const limiter = rateLimit({
@@ -42,15 +45,32 @@ const limiter = rateLimit({
 app.use('/send', limiter);
 app.use('/send-bulk', limiter);
 
+const loginLimiter = rateLimit({ windowMs: 15 * 60_000, max: 10, message: { ok: false, error: 'Demasiados intentos. Espera 15 minutos.' } });
+function signSession(username, expiresAt) {
+  const payload = Buffer.from(JSON.stringify({ sub: username, exp: expiresAt })).toString('base64url');
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
 function requireAuth(req, res, next) {
+  if (!SESSION_SECRET || !APP_USERNAME || !APP_PASSWORD) return res.status(503).json({ ok: false, error: 'Login no configurado.' });
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return res.status(401).json({ ok: false, error: 'Inicia sesión.' });
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest();
+  const supplied = Buffer.from(signature, 'base64url');
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return res.status(401).json({ ok: false, error: 'Sesión no válida.' });
+  try {
+    const session = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (session.sub !== APP_USERNAME || !Number.isFinite(session.exp) || session.exp <= Date.now()) return res.status(401).json({ ok: false, error: 'Sesión caducada. Inicia sesión de nuevo.' });
+  } catch { return res.status(401).json({ ok: false, error: 'Sesión no válida.' }); }
+  next();
+}
+function requireWebhookAuth(req, res, next) {
   const secret = process.env.API_SECRET?.trim();
-  if (!secret) return res.status(503).json({ ok: false, error: 'API_SECRET no configurado.' });
+  if (!secret) return res.status(503).json({ ok: false, error: 'Webhook no configurado.' });
   const supplied = String(req.headers['x-api-secret'] || '');
-  const valid = supplied.length === secret.length &&
-    crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(secret));
-  if (!valid) {
-    return res.status(401).json({ ok: false, error: 'No autorizado.' });
-  }
+  const valid = supplied.length === secret.length && crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(secret));
+  if (!valid) return res.status(401).json({ ok: false, error: 'No autorizado.' });
   next();
 }
 
@@ -223,7 +243,33 @@ function stripHtml(html) {
 // ============================================================
 // SEND — función principal (ahora persiste cada resultado en DB)
 // ============================================================
-async function sendSingle(mailOptions) {
+async function sendSingle(mailOptions, sender) {
+  if (process.env.BREVO_API_KEY) {
+    const payload = {
+      sender: { email: sender.fromEmail, name: sender.fromName || sender.fromEmail },
+      to: [{ email: mailOptions.to }],
+      subject: mailOptions.subject,
+    };
+    if (mailOptions.html) payload.htmlContent = mailOptions.html;
+    else payload.textContent = mailOptions.text || stripHtml(mailOptions.html);
+    if (mailOptions.replyTo) payload.replyTo = { email: mailOptions.replyTo };
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const err = new Error(body.message || `Brevo rechazó el envío (HTTP ${response.status}).`);
+      err.responseCode = response.status;
+      throw err;
+    }
+    await db.incrementSent();
+    await db.logEvent({ type: 'sent', email: mailOptions.to, messageId: body.messageId });
+    return { ok: true, messageId: body.messageId, smtp: 'Brevo API' };
+  }
+
   const transporterObj = getActiveTransporter();
   if (!transporterObj) throw new Error('Todos los servidores SMTP están bloqueados temporalmente.');
 
@@ -257,10 +303,23 @@ app.get('/', async (req, res) => {
   const dbOk = databaseReady && await db.checkDbConnection();
   const status = dbOk ? 200 : 503;
   res.status(status).json({
-    status: dbOk ? 'InboxPro Backend v2.2 funcionando' : 'InboxPro Backend no está listo',
+    status: dbOk ? 'InboxPro Backend v2.3 funcionando' : 'InboxPro Backend no está listo',
     database: dbOk ? 'conectada ✓ (estado persistente)' : 'DESCONECTADA ⚠️ (configura DATABASE_URL)',
-    smtpConfigured: smtpConfigs.length,
+    smtpConfigured: process.env.BREVO_API_KEY ? 1 : smtpConfigs.length,
+    mailProvider: process.env.BREVO_API_KEY ? 'Brevo API' : 'SMTP',
   });
+});
+
+app.post('/login', loginLimiter, async (req, res) => {
+  if (!APP_USERNAME || !APP_PASSWORD || !SESSION_SECRET) return res.status(503).json({ ok: false, error: 'Login no configurado.' });
+  const username = String(req.body?.username || '');
+  const password = String(req.body?.password || '');
+  const expected = Buffer.from(APP_PASSWORD);
+  const supplied = Buffer.from(password);
+  const validPassword = supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+  if (username !== APP_USERNAME || !validPassword) return res.status(401).json({ ok: false, error: 'Usuario o contraseña incorrectos.' });
+  const expiresAt = Date.now() + 12 * 60 * 60 * 1000;
+  res.json({ ok: true, token: signSession(username, expiresAt), expiresAt });
 });
 
 app.get('/status', requireAuth, async (req, res) => {
@@ -323,7 +382,7 @@ app.post('/send', requireAuth, async (req, res) => {
 
   try {
     const mailOptions = buildEmail({ to, subject, html, text, fromName, fromEmail, replyTo, priority, preheader, contact });
-    const result = await sendSingle(mailOptions);
+    const result = await sendSingle(mailOptions, { fromName, fromEmail });
     res.json(result);
   } catch (err) {
     console.error('[Send Error]', err.message);
@@ -390,7 +449,7 @@ app.post('/send-bulk', requireAuth, async (req, res) => {
 
       try {
         const mailOptions = buildEmail({ to, subject, html, text, fromName, fromEmail, replyTo, priority, preheader, contact });
-        const result = await sendSingle(mailOptions);
+        const result = await sendSingle(mailOptions, { fromName, fromEmail });
         if (result.ok) sent++; else bounced++;
       } catch (err) {
         bounced++;
@@ -410,7 +469,7 @@ app.post('/send-bulk', requireAuth, async (req, res) => {
   })();
 });
 
-app.post('/webhook/complaint', requireAuth, async (req, res) => {
+app.post('/webhook/complaint', requireWebhookAuth, async (req, res) => {
   const events = Array.isArray(req.body) ? req.body : [req.body];
   for (const e of events) {
     if (e.event === 'spam' || e.event === 'complaint') {
