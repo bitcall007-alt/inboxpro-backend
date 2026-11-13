@@ -16,6 +16,7 @@ const db         = require('./db');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
+let databaseReady = false;
 
 // ============================================================
 // MIDDLEWARE
@@ -132,7 +133,7 @@ async function checkAntiStrike() {
 
   const maxBounce = parseFloat(process.env.MAX_BOUNCE_RATE) || 2;
   if (state.totalSent > 20) {
-    const bounceRate = (state.bounceCount / state.totalSent) * 100;
+    const bounceRate = (state.totalBounces / state.totalSent) * 100;
     if (bounceRate >= maxBounce) {
       const reason = `Bounce rate ${bounceRate.toFixed(1)}% supera límite ${maxBounce}%. Revisa tu lista.`;
       await db.setPaused(true, reason);
@@ -253,9 +254,10 @@ async function sendSingle(mailOptions) {
 // RUTAS
 // ============================================================
 app.get('/', async (req, res) => {
-  const dbOk = await db.checkDbConnection();
-  res.json({
-    status: 'InboxPro Backend v2.1 funcionando',
+  const dbOk = databaseReady && await db.checkDbConnection();
+  const status = dbOk ? 200 : 503;
+  res.status(status).json({
+    status: dbOk ? 'InboxPro Backend v2.2 funcionando' : 'InboxPro Backend no está listo',
     database: dbOk ? 'conectada ✓ (estado persistente)' : 'DESCONECTADA ⚠️ (configura DATABASE_URL)',
     smtpConfigured: smtpConfigs.length,
   });
@@ -437,23 +439,16 @@ function hasHeaderBreaks(value) {
 }
 
 // ============================================================
-// START — inicializa la DB ANTES de aceptar tráfico
+// START — exige PostgreSQL inicializado antes de aceptar tráfico
 // ============================================================
 (async () => {
   try {
-    const dbOk = await db.checkDbConnection();
-    if (!dbOk) {
-      console.error(`
-⚠️  ADVERTENCIA: No se pudo conectar a PostgreSQL.
-    Verifica que agregaste el plugin "PostgreSQL" en Railway
-    y que DATABASE_URL está disponible como variable de entorno.
-    El backend funcionará pero el Anti-Strike NO será persistente.
-      `);
-    } else {
-      await db.initDb();
-    }
+    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL no está configurado.');
+    await db.initDb();
+    databaseReady = true;
   } catch (err) {
-    console.error('[DB Init Error]', err.message);
+    console.error('[DB Init Error] Backend detenido para proteger el estado Anti-Strike:', err.message);
+    process.exit(1);
   }
 
   app.listen(PORT, () => {

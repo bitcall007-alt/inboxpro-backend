@@ -1,4 +1,4 @@
-# InboxPro Backend v2.1 — FIX: Anti-Strike Persistente
+# InboxPro Backend v2.2 — FIX: Anti-Strike Persistente
 
 ## ⚠️ Qué se arregló respecto a v2.0
 
@@ -24,6 +24,8 @@ un bloqueo permanente en Brevo.
 
 3. Al iniciar, el backend crea automáticamente las tablas necesarias
    (`anti_strike_state` y `send_history`) — no hay pasos manuales de SQL.
+   Si PostgreSQL no está configurado o no responde, el servicio no arrancará
+   ni aceptará envíos hasta recuperar la persistencia.
 
 ## Requisitos de seguridad
 
@@ -41,8 +43,8 @@ Abre la URL de tu backend en el navegador. Si ves:
 "database": "conectada ✓ (estado persistente)"
 ```
 
-la persistencia está activa. Si ves `"DESCONECTADA ⚠️"`, falta el plugin
-PostgreSQL en Railway.
+la persistencia está activa. Si recibes HTTP 503 o ves `"DESCONECTADA ⚠️"`, falta el plugin
+PostgreSQL en Railway o la base de datos no está disponible.
 
 ## Nuevas rutas
 

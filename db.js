@@ -22,6 +22,7 @@ async function initDb() {
       sent_today    INT NOT NULL DEFAULT 0,
       bounce_count  INT NOT NULL DEFAULT 0,
       total_sent    INT NOT NULL DEFAULT 0,
+      total_bounces INT NOT NULL DEFAULT 0,
       spam_complaints INT NOT NULL DEFAULT 0,
       last_reset    DATE NOT NULL DEFAULT CURRENT_DATE,
       paused        BOOLEAN NOT NULL DEFAULT FALSE,
@@ -30,6 +31,8 @@ async function initDb() {
       CONSTRAINT single_row CHECK (id = 1)
     );
   `);
+
+  await pool.query(`ALTER TABLE anti_strike_state ADD COLUMN IF NOT EXISTS total_bounces INT NOT NULL DEFAULT 0;`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS send_history (
@@ -82,6 +85,7 @@ async function getState() {
   return {
     sentToday: state.sent_today,
     bounceCount: state.bounce_count,
+    totalBounces: state.total_bounces,
     totalSent: state.total_sent,
     spamComplaints: state.spam_complaints,
     paused: state.paused,
@@ -104,7 +108,8 @@ async function incrementSent() {
 async function incrementBounce() {
   await pool.query(`
     UPDATE anti_strike_state
-    SET bounce_count = bounce_count + 1, total_sent = total_sent + 1, updated_at = NOW()
+    SET bounce_count = bounce_count + 1, total_bounces = total_bounces + 1,
+        total_sent = total_sent + 1, updated_at = NOW()
     WHERE id = 1;
   `);
 }

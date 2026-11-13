@@ -933,9 +933,10 @@ async function testBackend(){
   try{
     const res=await fetch(url+'/',{signal:AbortSignal.timeout(8000)});
     const data=await res.json();
+    if(!res.ok||!data.database?.includes('conectada'))throw new Error(data.database||`HTTP ${res.status}`);
     showResult('backendTestResult','ok',`✅ Backend online — ${data.status}`);
     updateSmtpChip(true);
-  }catch(e){showResult('backendTestResult','danger',`✗ Error: ${e.message}. Verifica que el backend esté deployado en Railway.`);}
+  }catch(e){updateSmtpChip(false);showResult('backendTestResult','danger',`✗ Error: ${e.message}. Verifica Railway y que PostgreSQL esté conectado.`);}
 }
 function showResult(id,t,m){const el=document.getElementById(id);el.style.display='block';el.className=`alert alert-${t}`;el.textContent=m;}
 function updateSmtpChip(ok){
